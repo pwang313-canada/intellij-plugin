@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.cakk.property.action.ConvertYamlToPropertiesActionTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-03-19T02:17:37" hostname="LAPTOP-OO49UQLG" time="0.037">
+  <properties/>
+  <testcase name="testConvertYamlWithList()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.022"/>
+  <testcase name="testConvertYamlPrimitiveRoot()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.001"/>
+  <testcase name="testFlattenMap()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.0"/>
+  <testcase name="testBuildPropertiesContentSorted()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.0"/>
+  <testcase name="testFlattenList()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.001"/>
+  <testcase name="testConvertSimpleYaml()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.002"/>
+  <testcase name="testConvertEmptyYamlThrowsException()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.003"/>
+  <testcase name="testConvertNestedYaml()" classname="org.cakk.property.action.ConvertYamlToPropertiesActionTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
