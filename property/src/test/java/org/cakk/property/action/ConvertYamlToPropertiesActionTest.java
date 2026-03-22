@@ -1,6 +1,7 @@
 package org.cakk.property.action;
 
 import com.intellij.openapi.vfs.VirtualFile;
+import org.cakk.property.property.ConvertYamlToPropertiesAction;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
