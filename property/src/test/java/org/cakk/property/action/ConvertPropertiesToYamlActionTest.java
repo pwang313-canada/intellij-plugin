@@ -1,13 +1,13 @@
 package org.cakk.property.action;
 
 import com.intellij.openapi.vfs.VirtualFile;
+import org.cakk.property.property.ConvertPropertiesToYamlAction;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ConvertPropertiesToYamlActionTest {

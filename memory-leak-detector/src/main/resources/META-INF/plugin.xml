@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE idea-plugin PUBLIC "Plugin/DTD" "https://plugins.jetbrains.com/plugin.dtd">
+<idea-plugin>
+    <id>org.cakk.memory-leak-detector</id>
+    <name>Memory Leak Detector</name>
+    <version>1.0.0</version>
+    <vendor email="support@cakk.org" url="https://cakk.org">CAKK</vendor>
+
+    <description><![CDATA[
+        <h2>Real-time Memory Leak Detection for IntelliJ IDEA</h2>
+        <p>Monitor JVM memory usage and detect potential memory leaks in your application.</p>
+
+        <h3>Features:</h3>
+        <ul>
+            <li><b>Real-time Monitoring</b> - Watch heap and old generation memory usage in real-time</li>
+            <li><b>Interactive Chart</b> - Visual representation of memory usage over time</li>
+            <li><b>Automatic Leak Detection</b> - Detects rapid memory growth patterns</li>
+            <li><b>GC Analysis</b> - Tracks GC events and efficiency metrics</li>
+            <li><b>User Confirmation</b> - Prompts user before invoking System.gc()</li>
+            <li><b>Leak Simulation</b> - Built-in simulation to test detection</li>
+            <li><b>Configurable Thresholds</b> - Customize detection sensitivity</li>
+            <li><b>Detailed Logging</b> - Complete history of GC events and alerts</li>
+        </ul>
+
+        <h3>How to Use:</h3>
+        <ol>
+            <li>Open <b>View → Tool Windows → Memory Monitor</b></li>
+            <li>Click <b>Start Monitoring</b> to begin tracking memory usage</li>
+            <li>Watch the chart and statistics for unusual growth patterns</li>
+            <li>When rapid growth is detected, a dialog will ask if you want to run GC</li>
+            <li>Use <b>Simulate Leak</b> to test the detection system</li>
+        </ol>
+
+        <h3>Detection Thresholds:</h3>
+        <ul>
+            <li><b>Rapid Growth:</b> >10% growth per interval</li>
+            <li><b>Warning:</b> >20% growth from baseline with low GC efficiency</li>
+            <li><b>High Risk:</b> >50% growth with very poor GC efficiency</li>
+            <li><b>Critical:</b> Old gen increasing after each GC cycle</li>
+        </ul>
+
+        <p>Configure thresholds in <b>Settings → Tools → Memory Leak Detector</b></p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>Version 1.0.0 (Initial Release)</h3>
+        <ul>
+            <li>Initial release of Memory Leak Detector</li>
+            <li>Real-time heap and old generation monitoring</li>
+            <li>Automatic leak detection with multiple severity levels</li>
+            <li>Interactive GC confirmation dialog</li>
+            <li>Memory chart with zoom capability</li>
+            <li>GC event tracking and efficiency analysis</li>
+            <li>Leak simulation for testing</li>
+            <li>Configurable detection thresholds</li>
+            <li>Tool window with statistics panel and log viewer</li>
+            <li>Keyboard shortcuts (Ctrl+Alt+M to start monitoring)</li>
+        </ul>
+
+        <h3>Known Issues</h3>
+        <ul>
+            <li>First GC after baseline may show negative efficiency (normal)</li>
+            <li>Some GC events may be duplicated in log</li>
+        </ul>
+
+        <h3>Planned Features</h3>
+        <ul>
+            <li>Heap dump analysis on leak detection</li>
+            <li>Export memory data to CSV</li>
+            <li>Email notifications for critical alerts</li>
+            <li>Integration with IntelliJ Profiler</li>
+        </ul>
+    ]]></change-notes>
+
+    <idea-version since-build="233" until-build="242.*"/>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window -->
+        <toolWindow id="Memory Monitor"
+                    factoryClass="org.cakk.memoryleak.ui.MemoryMonitorToolWindowFactory"
+                    anchor="bottom"
+                    icon="AllIcons.Debugger.MemoryView"
+                    canCloseContents="false"/>
+
+        <!-- Services -->
+        <projectService serviceImplementation="org.cakk.memoryleak.settings.MemoryLeakSettings"/>
+
+        <!-- Settings Page -->
+        <projectConfigurable instance="org.cakk.memoryleak.ui.MemoryLeakSettingsConfigurable"
+                             id="org.cakk.memoryleak.settings"
+                             displayName="Memory Leak Detector"
+                             parentId="tools"/>
+
+        <!-- Notifications -->
+        <notificationGroup id="Memory Leak Detector"
+                           displayType="BALLOON"
+                           isLogByDefault="true"/>
+    </extensions>
+
+    <actions>
+        <!-- Start Monitoring Action -->
+        <action id="MemoryLeakDetector.StartMonitoring"
+                class="org.cakk.memoryleak.actions.StartDetectionAction"
+                text="Start Memory Monitoring"
+                description="Start monitoring memory usage for leaks"
+                icon="AllIcons.Actions.Execute">
+            <add-to-group group-id="ToolsMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt M"/>
+        </action>
+
+        <!-- Stop Monitoring Action -->
+        <action id="MemoryLeakDetector.StopMonitoring"
+                class="org.cakk.memoryleak.actions.StopDetectionAction"
+                text="Stop Memory Monitoring"
+                description="Stop memory monitoring"
+                icon="AllIcons.Actions.Suspend">
+            <add-to-group group-id="ToolsMenu" anchor="first"/>
+        </action>
+
+        <!-- Simulate Leak Action -->
+        <action id="MemoryLeakDetector.SimulateLeak"
+                class="org.cakk.memoryleak.actions.SimulateLeakAction"
+                text="Simulate Memory Leak"
+                description="Run a memory leak simulation to test detection"
+                icon="AllIcons.General.Warning">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <!-- Force GC Action -->
+        <action id="MemoryLeakDetector.ForceGC"
+                class="org.cakk.memoryleak.actions.ForceGCAction"
+                text="Force Garbage Collection"
+                description="Request JVM to run garbage collection"
+                icon="AllIcons.Actions.GC">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <!-- Toggle Monitoring Action -->
+        <action id="MemoryLeakDetector.ToggleMonitoring"
+                class="org.cakk.memoryleak.actions.ToggleMonitoringAction"
+                text="Toggle Memory Monitoring"
+                description="Start or stop memory monitoring">
+            <add-to-group group-id="ToolsMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift M"/>
+        </action>
+    </actions>
+
+    <projectListeners>
+        <listener class="org.cakk.memoryleak.listeners.ProjectCloseListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </projectListeners>
+
+    <applicationListeners>
+        <listener class="org.cakk.memoryleak.listeners.ApplicationCloseListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
+    <!-- Resource bundle for i18n (optional) -->
+</idea-plugin>
