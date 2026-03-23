@@ -4,6 +4,7 @@ package org.cakk.memoryleak.ui;
 import com.intellij.ui.JBColor;
 import com.intellij.util.ui.JBUI;
 import org.cakk.memoryleak.services.MemoryMonitorService;
+import org.cakk.memoryleak.services.RemoteMemoryMonitorService;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,10 +25,39 @@ public class MemoryChartPanel extends JPanel {
     setPreferredSize(new Dimension(800, 300));
   }
 
-  public void addDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
-    heapData.add(new DataPoint(snapshot.timestamp(), snapshot.heapUsed()));
-    oldGenData.add(new DataPoint(snapshot.timestamp(), snapshot.oldGenUsed()));
+  // ========== PUBLIC METHODS ==========
 
+  /**
+   * Add data point from local monitoring
+   */
+  public void addLocalDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
+  }
+
+  /**
+   * Add data point from remote monitoring
+   * FIXED: Use RemoteMemorySnapshot, not MemorySnapshot
+   */
+  public void addRemoteDataPoint(RemoteMemoryMonitorService.RemoteMemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
+  }
+
+  /**
+   * Add data point from legacy method (for backward compatibility)
+   */
+  public void addDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
+  }
+
+  /**
+   * Core method to add data points
+   */
+  private void addDataPoint(long heapUsed, long oldGenUsed) {
+    long timestamp = System.currentTimeMillis();
+    heapData.add(new DataPoint(timestamp, heapUsed));
+    oldGenData.add(new DataPoint(timestamp, oldGenUsed));
+
+    // Trim data if exceeds max points
     while (heapData.size() > MAX_DATA_POINTS) {
       heapData.remove(0);
     }
@@ -35,11 +65,25 @@ public class MemoryChartPanel extends JPanel {
       oldGenData.remove(0);
     }
 
-    maxHeap = Math.max(maxHeap, snapshot.heapUsed());
-    maxOldGen = Math.max(maxOldGen, snapshot.oldGenUsed());
+    // Update max values for scaling
+    maxHeap = Math.max(maxHeap, heapUsed);
+    maxOldGen = Math.max(maxOldGen, oldGenUsed);
 
     repaint();
   }
+
+  /**
+   * Clear all data points
+   */
+  public void clear() {
+    heapData.clear();
+    oldGenData.clear();
+    maxHeap = 0;
+    maxOldGen = 0;
+    repaint();
+  }
+
+  // ========== PAINTING METHODS ==========
 
   @Override
   protected void paintComponent(Graphics g) {
@@ -71,24 +115,26 @@ public class MemoryChartPanel extends JPanel {
     // Draw labels
     g2.setColor(JBColor.foreground());
     g2.drawString("Memory (MB)", 10, startY + height / 2);
-    g2.drawString("Time", startX + width / 2, startY + height + 20);
+    g2.drawString("Time (seconds)", startX + width / 2, startY + height + 20);
 
     // Draw Y-axis labels
-    for (int i = 0; i <= 4; i++) {
-      long value = Math.max(maxHeap, maxOldGen);
-      long labelValue = (value * i) / 4;
-      int y = startY + height - (height * i / 4);
-      g2.drawString(formatBytes(labelValue), startX - 45, y + 4);
+    long maxValue = Math.max(maxHeap, maxOldGen);
+    if (maxValue > 0) {
+      for (int i = 0; i <= 4; i++) {
+        long labelValue = (maxValue * i) / 4;
+        int y = startY + height - (height * i / 4);
+        g2.drawString(formatBytes(labelValue), startX - 45, y + 4);
+      }
     }
 
-    // Draw data
-    if (!heapData.isEmpty()) {
+    // Draw data - FIXED: Pass correct max values
+    if (!heapData.isEmpty() && maxHeap > 0) {
       drawLineChart(g2, heapData, new JBColor(new Color(0, 100, 255), new Color(80, 140, 255)),
-              startX, startY, width, height, Math.max(maxHeap, 1));
+              startX, startY, width, height, maxHeap);
     }
-    if (!oldGenData.isEmpty()) {
+    if (!oldGenData.isEmpty() && maxOldGen > 0) {
       drawLineChart(g2, oldGenData, new JBColor(new Color(255, 80, 80), new Color(255, 120, 120)),
-              startX, startY, width, height, Math.max(maxOldGen, 1));
+              startX, startY, width, height, maxOldGen);
     }
 
     // Draw legend
@@ -99,20 +145,26 @@ public class MemoryChartPanel extends JPanel {
 
   private void drawLineChart(Graphics2D g2, List<DataPoint> data, Color color,
                              int startX, int startY, int width, int height, long maxValue) {
-    if (data.size() < 2) return;
+    if (data.size() < 2 || maxValue == 0) return;
 
     g2.setColor(color);
     g2.setStroke(new BasicStroke(2f));
 
     double xStep = (double) width / MAX_DATA_POINTS;
+
+    // Calculate first point
+    double firstY = startY + height - (data.get(0).value() * height / maxValue);
     double lastX = startX;
-    double lastY = startY + height - (data.get(0).value() * height / maxValue);
+    double lastY = firstY;
 
     for (int i = 1; i < data.size(); i++) {
       double x = startX + i * xStep;
       double y = startY + height - (data.get(i).value() * height / maxValue);
 
-      g2.drawLine((int) lastX, (int) lastY, (int) x, (int) y);
+      // Only draw if y is within bounds
+      if (y >= startY && y <= startY + height) {
+        g2.drawLine((int) lastX, (int) lastY, (int) x, (int) y);
+      }
 
       lastX = x;
       lastY = y;
@@ -135,16 +187,13 @@ public class MemoryChartPanel extends JPanel {
 
   private String formatBytes(long bytes) {
     double mb = bytes / (1024.0 * 1024.0);
+    if (mb < 1) {
+      return String.format("%.0f KB", bytes / 1024.0);
+    }
     return String.format("%.0f MB", mb);
   }
 
-  public void clear() {
-    heapData.clear();
-    oldGenData.clear();
-    maxHeap = 0;
-    maxOldGen = 0;
-    repaint();
-  }
+  // ========== INNER CLASS ==========
 
   private record DataPoint(long timestamp, long value) {}
 }
