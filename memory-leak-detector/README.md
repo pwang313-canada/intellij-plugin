@@ -1,56 +1,76 @@
-# Memory Leak Deetctor
+# Memory Leak Detector
 
 An IntelliJ IDEA plugin to help detecting memory leak.
 
-## Features
+## How to Confirm a Java Memory Leak
 
-- **Old Gen growth rapidly**: 
-    - If old gen growth rapidly, a warning alert will be generated.
+- **Rapid Old Gen Growth**: 
+    - The used heap and Old Generation (Old Gen) grow rapidly over time.
 
-- **Garbage Collection perform**:
-    - After perform GC, check the old gen size change.
+- **Ineffective Garbage Collection**:
+    - After triggering GC, the Heap Used and Old Gen do not decrease significantly..
+
 
 ## How to Use
+### 1, Install the plugin.
+clone the repo
 
-### 1. Merge & Clean Properties Files
+`https://github.com/pwang313-canada/intellij-plugin.git`
 
-1. Right-click on the **`resources`** folder in your project.
-2. Select **"Merge and Clean Properties Files"**.
-3. Confirm the action in the dialog.
-4. The plugin will:
-    - Move common properties to `application.properties`
-    - Remove those properties from environment-specific files
-    - Sort all properties files alphabetically
+Navigate to the plugin directory:
 
-### 2. Convert Between Properties and YAML
+`memory-leak-detector`
 
-Right-click on the yml or properties files, 
-![how-to-use.png](src/main/resources/images/how-to-use.png)
+Build the plugin:
 
-## Requirements
+`./gradlew clean buildPlugin`
 
-- IntelliJ IDEA (Community or Ultimate)
-- Spring Boot project with configuration files under `src/main/resources`
+After MemoryLeakDetector.jar is generated, install it as a local plugin in IntelliJ IDEA.
 
-## Installation
+### 2. Start Java application as follow
 
-You can install the plugin directly from the JetBrains Marketplace:
+Add some VM parameters to command line, either from
 
-1. Open **Settings/Preferences** → **Plugins**
-2. Go to **Marketplace** tab
-3. Search for "**Properties Merger & Converter**"
-4. Click **Install**
-   ![install-plugin.png](src/main/resources/images/install-plugin.png)
-*Alternatively, you can build from source and install the `.zip` file.*
+`java -Dcom.sun.management.jmxremote      \
+    -Dcom.sun.management.jmxremote.port=9010      \
+    -Dcom.sun.management.jmxremote.authenticate=false      \
+    -Dcom.sun.management.jmxremote.ssl=false \
+    StaticReference`
 
-## Screenshots
+Or configure them in IntelliJ:
+
+![add-vm-to-intellij.png](src/main/resources/images/add-vm-to-intellij.png)
+
+### 3. Start the plugin and Connect to the Java application
+
+![start-intellij-plugin.png](src/main/resources/images/start-intellij-plugin.png)
+
+## 4. monitor memory change
+
+![connect-to-process.png](src/main/resources/images/connect-to-process.png)
+
+Once the plugin appears at the left bottom, you will see:
+
+**`Start Local`**
+
+**`Connect to Process`**
+
+If a process appears greyed out, it means the VM parameters are not configured correctly.
+
+you may get a warning like this
+
+![memory-leak-warning.png](src/main/resources/images/memory-leak-warning.png)
+
+### 5. Confirm a Memory Leak
+
+If `Used Heap` and `Old Gen` do not decrease significantly,
+👉 this is a strong indication of a memory leak.
+
+![memory-leak-confirm.png](src/main/resources/images/memory-leak-confirm.png)
 
 ## Future Enhancements
 
-- Bidirectional conversion between `.properties` ↔ `.yml`/`.yaml`
-- Support for `bootstrap.properties` / `bootstrap.yml`
-- Option to treat properties with environment names in values as env-specific
-- Customizable common property detection rules
+- Located the specific file and line number for the memory leak
 
 ## Contributing
 
