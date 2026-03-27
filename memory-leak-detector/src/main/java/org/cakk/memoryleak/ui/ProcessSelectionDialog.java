@@ -83,7 +83,7 @@ public class ProcessSelectionDialog extends DialogWrapper {
             "To monitor a Java application for memory leaks:\n\n" +
                     "1. Run your application with JMX enabled:\n" +
                     "   java -Dcom.sun.management.jmxremote \\\n" +
-                    "        -Dcom.sun.management.jmxremote.port=9010 \\\n" +
+                    "        -Dcom.sun.management.jmxremote.port=9020 \\\n" +
                     "        -Dcom.sun.management.jmxremote.authenticate=false \\\n" +
                     "        -Dcom.sun.management.jmxremote.ssl=false \\\n" +
                     "        -jar your-app.jar\n\n" +
@@ -126,10 +126,6 @@ public class ProcessSelectionDialog extends DialogWrapper {
               JOptionPane.ERROR_MESSAGE
       );
     }
-  }
-
-  public RemoteMemoryMonitorService.JavaProcess getSelectedProcess() {
-    return selectedProcess;
   }
 
   private static class ProcessListRenderer extends DefaultListCellRenderer {

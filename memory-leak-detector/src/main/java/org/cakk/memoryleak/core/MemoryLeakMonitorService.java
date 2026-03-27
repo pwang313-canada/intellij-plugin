@@ -12,7 +12,6 @@ import java.lang.management.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service(Service.Level.PROJECT)
 public final class MemoryLeakMonitorService {

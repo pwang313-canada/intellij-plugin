@@ -14,7 +14,6 @@ import javax.management.openmbean.CompositeData;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
-import java.io.File;
 import java.lang.management.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -112,8 +111,8 @@ public final class RemoteMemoryMonitorService {
     LOG.info("Attempting to connect to process: " + pid);
 
     // Try JMX port connection
-    if (tryConnectViaPort(9010)) {
-      LOG.info("Successfully connected via JMX port 9010");
+    if (tryConnectViaPort(9020)) {
+      LOG.info("Successfully connected via JMX port 9020");
       connectedPid = pid;
       isConnected.set(true);
       notifyConnectionStatusChanged(true, pid);
@@ -130,7 +129,7 @@ public final class RemoteMemoryMonitorService {
     }
 
     LOG.error("Failed to connect to process: " + pid);
-    throw new Exception("Cannot connect. Make sure JMX is enabled with -Dcom.sun.management.jmxremote.port=9010");
+    throw new Exception("Cannot connect. Make sure JMX is enabled with -Dcom.sun.management.jmxremote.port=9020");
   }
 
   /**
@@ -196,7 +195,7 @@ public final class RemoteMemoryMonitorService {
    * Check if JMX is enabled on a process
    */
   private boolean checkJMXEnabled(String pid) {
-    int[] ports = {9010, 9090, 9999, 1099};
+    int[] ports = {9020, 9090, 9999, 1099};
     for (int port : ports) {
       try {
         String jmxUrl = String.format(
