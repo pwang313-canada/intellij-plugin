@@ -10,6 +10,24 @@
         <h2>Real-time Memory Leak Detection for IntelliJ IDEA</h2>
         <p>Monitor JVM memory usage and detect potential memory leaks in your application.</p>
 
+            <h3>📸 Screenshots</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin: 20px 0;">
+                <div style="text-align: center; flex: 1; min-width: 300px;">
+                    <img src="/images/memory-leak-confirm.png"
+                         alt="Main Monitoring Window"
+                         width="100%"
+                         style="border: 1px solid #ccc; border-radius: 4px;"/>
+                    <p><em>Real-time memory monitoring with toggleable metrics</em></p>
+                </div>
+                <div style="text-align: center; flex: 1; min-width: 300px;">
+                    <img src="https://github.com/pwang313-canada/intellij-property/blob/main/src/main/resources/images/how-to-use.png"
+                         alt="Memory Leak Alert"
+                         width="100%"
+                         style="border: 1px solid #ccc; border-radius: 4px;"/>
+                    <p><em>Automatic alert when memory leak is detected</em></p>
+                </div>
+            </div>
+
         <h3>Features:</h3>
         <ul>
             <li><b>Real-time Monitoring</b> - Watch heap and old generation memory usage in real-time</li>

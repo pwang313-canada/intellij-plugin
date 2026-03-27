@@ -17,6 +17,7 @@ import java.util.List;
 
 public class DetailedGCAnalysisAction extends AnAction {
 
+  @SuppressWarnings("removal")
   @Override
   public void actionPerformed(@NotNull AnActionEvent e) {
     Project project = e.getProject();
