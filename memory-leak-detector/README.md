@@ -32,7 +32,7 @@ After MemoryLeakDetector.jar is generated, install it as a local plugin in Intel
 Add some VM parameters to command line, either from
 
 `java -Dcom.sun.management.jmxremote      \
-    -Dcom.sun.management.jmxremote.port=9010      \
+    -Dcom.sun.management.jmxremote.port=9020      \
     -Dcom.sun.management.jmxremote.authenticate=false      \
     -Dcom.sun.management.jmxremote.ssl=false \
     StaticReference`

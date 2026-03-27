@@ -123,22 +123,6 @@ public final class MemoryLeakSettings implements PersistentStateComponent<Memory
     this.baselineSettleTimeSeconds = baselineSettleTimeSeconds;
   }
 
-  public int getMaxGcEventsToKeep() {
-    return maxGcEventsToKeep;
-  }
-
-  public void setMaxGcEventsToKeep(int maxGcEventsToKeep) {
-    this.maxGcEventsToKeep = maxGcEventsToKeep;
-  }
-
-  public int getMaxSnapshotsToKeep() {
-    return maxSnapshotsToKeep;
-  }
-
-  public void setMaxSnapshotsToKeep(int maxSnapshotsToKeep) {
-    this.maxSnapshotsToKeep = maxSnapshotsToKeep;
-  }
-
   public boolean isShowGcConfirmationDialog() {
     return showGcConfirmationDialog;
   }
@@ -180,51 +164,10 @@ public final class MemoryLeakSettings implements PersistentStateComponent<Memory
   }
 
   public boolean isShowMemoryChart() {
-    return showMemoryChart;
+    return this.showMemoryChart;
   }
 
   public void setShowMemoryChart(boolean showMemoryChart) {
     this.showMemoryChart = showMemoryChart;
   }
-
-  public boolean isShowGcEvents() {
-    return showGcEvents;
-  }
-
-  public void setShowGcEvents(boolean showGcEvents) {
-    this.showGcEvents = showGcEvents;
-  }
-
-  public boolean isEnableLeakSimulation() {
-    return enableLeakSimulation;
-  }
-
-  public void setEnableLeakSimulation(boolean enableLeakSimulation) {
-    this.enableLeakSimulation = enableLeakSimulation;
-  }
-
-  public boolean isTrackAllocationStacks() {
-    return trackAllocationStacks;
-  }
-
-  public void setTrackAllocationStacks(boolean trackAllocationStacks) {
-    this.trackAllocationStacks = trackAllocationStacks;
-  }
-
-  public boolean isEnableAutoDumpOnLeak() {
-    return enableAutoDumpOnLeak;
-  }
-
-  public void setEnableAutoDumpOnLeak(boolean enableAutoDumpOnLeak) {
-    this.enableAutoDumpOnLeak = enableAutoDumpOnLeak;
-  }
-
-  public String getDumpPath() {
-    return dumpPath;
-  }
-
-  public void setDumpPath(String dumpPath) {
-    this.dumpPath = dumpPath;
-  }
-
 }

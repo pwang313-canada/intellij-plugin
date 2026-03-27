@@ -1,11 +1,13 @@
-// src/main/java/org/cakk/memoryleak/services/MemoryMonitorService.java
 package org.cakk.memoryleak.services;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.sun.management.GarbageCollectionNotificationInfo;
 import com.sun.management.GcInfo;
+import org.cakk.memoryleak.analysis.AllocationStackAnalyzer;
 import org.jetbrains.annotations.NotNull;
 
 import javax.management.NotificationEmitter;
@@ -20,6 +22,8 @@ public final class MemoryMonitorService {
 
   private static final Logger LOG = Logger.getInstance(MemoryMonitorService.class);
 
+  private final AllocationTracker allocationTracker;
+  private final AllocationInterceptor allocationInterceptor;
   private final Project project;
   private final MemoryMXBean memoryBean;
   private final List<MemoryPoolMXBean> memoryPools;
@@ -28,6 +32,12 @@ public final class MemoryMonitorService {
   private final List<GcEvent> gcEvents = new CopyOnWriteArrayList<>();
   private final List<MemorySnapshot> memorySnapshots = new CopyOnWriteArrayList<>();
   private final List<MemoryMonitorListener> listeners = new CopyOnWriteArrayList<>();
+
+  // Allocation Stack Analyzer
+  private final AllocationStackAnalyzer stackAnalyzer;
+
+  // Track allocation samples
+  private final Queue<AllocationSample> allocationSamples = new ConcurrentLinkedQueue<>();
 
   // Statistics for leak detection
   private long baselineUsedHeap = 0;
@@ -46,13 +56,25 @@ public final class MemoryMonitorService {
   private volatile double currentRecentGrowthRate = 0;
   private volatile double currentGcEfficiency = 100;
 
+  // Track last known leak locations
+  private volatile List<AllocationStackAnalyzer.LeakLocation> lastKnownLeaks = new ArrayList<>();
+
   // Detection thresholds
-  private static final double RAPID_GROWTH_THRESHOLD = 10.0;
   private static final double WARNING_GROWTH_THRESHOLD = 20.0;
   private static final double HIGH_RISK_GROWTH_THRESHOLD = 50.0;
   private static final double LOW_GC_EFFICIENCY_THRESHOLD = 20.0;
   private static final double CRITICAL_GC_EFFICIENCY_THRESHOLD = 10.0;
   private static final int BASELINE_INCREASE_ALERT_THRESHOLD = 3;
+
+  // Allocation tracking thresholds
+  private static final long ALLOCATION_SAMPLE_THRESHOLD = 1024 * 1024; // 1 MB
+  private static final int MAX_ALLOCATION_SAMPLES = 100;
+
+  private RemoteMemoryMonitorService remoteMonitorService;
+  private boolean isRemoteMode = false;
+
+  // Track heap size
+  private long lastHeapSize = 0;
 
   // Data classes
   public record GcEvent(
@@ -102,6 +124,31 @@ public final class MemoryMonitorService {
           Map<String, Object> details
   ) {}
 
+  public AllocationTracker getAllocationTracker() {
+    return allocationTracker;
+  }
+  // Allocation sample record
+  private static class AllocationSample {
+    final String className;
+    final String methodName;
+    final String fileName;
+    final int lineNumber;
+    final long size;
+    final long timestamp;
+    final String stackTrace;
+
+    AllocationSample(String className, String methodName, String fileName,
+                     int lineNumber, long size, String stackTrace) {
+      this.className = className;
+      this.methodName = methodName;
+      this.fileName = fileName;
+      this.lineNumber = lineNumber;
+      this.size = size;
+      this.timestamp = System.currentTimeMillis();
+      this.stackTrace = stackTrace;
+    }
+  }
+
   // Listener interface
   public interface MemoryMonitorListener {
     void onMemoryUpdate(@NotNull MemorySnapshot snapshot);
@@ -122,13 +169,389 @@ public final class MemoryMonitorService {
     this.project = project;
     this.memoryBean = ManagementFactory.getMemoryMXBean();
     this.memoryPools = ManagementFactory.getMemoryPoolMXBeans();
+    this.stackAnalyzer = new AllocationStackAnalyzer(project);
+    this.allocationTracker = new AllocationTracker(project);
+    this.allocationInterceptor = new AllocationInterceptor(project);
+    this.remoteMonitorService = project.getService(RemoteMemoryMonitorService.class);
+    LOG.info("MemoryMonitorService initialized with AllocationInterceptor");
+    setupRemoteListener();
+
+    // Start allocation tracking thread
+    startAllocationTracking();
   }
 
-  // ========== PUBLIC API METHODS ==========
+  private void setupRemoteListener() {
+    if (remoteMonitorService != null) {
+      remoteMonitorService.addListener(new RemoteMemoryMonitorService.RemoteMemoryListener() {
+        @Override
+        public void onMemoryUpdate(RemoteMemoryMonitorService.RemoteMemorySnapshot snapshot) {
+          if (isRemoteMode && isMonitoring.get()) {
+            // Forward to listeners with remote flag
+            MemorySnapshot localSnapshot = convertToLocalSnapshot(snapshot);
+            notifyMemoryUpdate(localSnapshot);
+
+            // Check for leaks in remote process
+            checkRemoteMemoryLeak(snapshot);
+          }
+        }
+
+        @Override
+        public void onGcEvent(RemoteMemoryMonitorService.GcEvent event) {
+          if (isRemoteMode && isMonitoring.get()) {
+            // Forward GC event
+            GcEvent localEvent = convertToLocalGcEvent(event);
+            notifyGcEvent(localEvent);
+
+            // Check if old gen increases after GC (leak pattern)
+            if (event.oldGenAfter() > event.oldGenBefore() * 0.9) {
+              LOG.warn(String.format(
+                      "⚠️ Remote process leak detected! Old gen decreased by only %.1f%% after GC",
+                      ((event.oldGenBefore() - event.oldGenAfter()) * 100.0) / event.oldGenBefore()
+              ));
+
+              // Trigger leak detection
+              ApplicationManager.getApplication().invokeLater(() -> {
+                int result = Messages.showYesNoDialog(
+                        project,
+                        String.format(
+                                "⚠️ MEMORY LEAK DETECTED in remote process!\n\n" +
+                                        "Process PID: %s\n" +
+                                        "GC: %s\n" +
+                                        "Old Gen Before: %s\n" +
+                                        "Old Gen After: %s\n\n" +
+                                        "Objects are surviving GC - this is a classic memory leak.\n\n" +
+                                        "Do you want to analyze the leak location?",
+                                remoteMonitorService.getConnectedPid(),
+                                event.gcName(),
+                                formatBytes(event.oldGenBefore()),
+                                formatBytes(event.oldGenAfter())
+                        ),
+                        "Remote Memory Leak Detected",
+                        "Analyze",
+                        "Ignore",
+                        Messages.getWarningIcon()
+                );
+
+                if (result == Messages.YES) {
+                  triggerRemoteLeakAnalysis();
+                }
+              });
+            }
+          }
+        }
+
+        @Override
+        public void onConnectionStatusChanged(boolean connected, String pid) {
+          if (connected) {
+            isRemoteMode = true;
+            LOG.info("Connected to remote process: " + pid);
+            // Reset baseline for remote process
+            establishBaseline();
+          } else {
+            isRemoteMode = false;
+            LOG.info("Disconnected from remote process");
+          }
+        }
+
+        @Override
+        public void onError(String error) {
+          LOG.error("Remote monitoring error: " + error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Switch to remote monitoring mode
+   */
+  public void switchToRemoteMode(String pid) throws Exception {
+    if (remoteMonitorService != null && remoteMonitorService.connectToProcess(pid)) {
+      LOG.info("Switched to remote monitoring mode for PID: " + pid);
+      // Stop local monitoring if running
+      if (isMonitoring.get()) {
+        stopMonitoring();
+      }
+      // Start remote monitoring
+      startMonitoring();
+    }
+  }
+
+  /**
+   * Switch back to local monitoring
+   */
+  public void switchToLocalMode() {
+    if (remoteMonitorService != null && remoteMonitorService.isConnected()) {
+      remoteMonitorService.disconnect();
+    }
+    isRemoteMode = false;
+    LOG.info("Switched to local monitoring mode");
+  }
+
+  /**
+   * Check remote memory for leak patterns
+   */
+  private void checkRemoteMemoryLeak(RemoteMemoryMonitorService.RemoteMemorySnapshot snapshot) {
+    if (lastHeapSize > 0) {
+      long growth = snapshot.heapUsed() - lastHeapSize;
+
+      if (growth > 10 * 1024 * 1024) { // 10MB growth
+        LOG.warn(String.format(
+                "⚠️ Remote process heap grew by %s! Tracking allocation...",
+                formatBytes(growth)
+        ));
+
+        // Show notification
+        ApplicationManager.getApplication().invokeLater(() -> {
+          int result = Messages.showYesNoDialog(
+                  project,
+                  String.format(
+                          "⚠️ Remote process memory is growing rapidly!\n\n" +
+                                  "Process PID: %s\n" +
+                                  "Heap growth: %s (%.1f MB total)\n" +
+                                  "Old Gen: %s\n\n" +
+                                  "This may indicate a memory leak.\n\n" +
+                                  "Do you want to analyze the leak?",
+                          remoteMonitorService.getConnectedPid(),
+                          formatBytes(growth),
+                          snapshot.heapUsed() / (1024.0 * 1024),
+                          formatBytes(snapshot.oldGenUsed())
+                  ),
+                  "Remote Memory Growth Detected",
+                  "Analyze",
+                  "Ignore",
+                  Messages.getWarningIcon()
+          );
+
+          if (result == Messages.YES) {
+            triggerRemoteLeakAnalysis();
+          }
+        });
+      }
+    }
+    lastHeapSize = snapshot.heapUsed();
+  }
+
+  /**
+   * Trigger leak analysis on remote process
+   */
+  public void triggerRemoteLeakAnalysis() {
+    ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      try {
+        LOG.info("Starting remote memory leak analysis...");
+
+        // Force GC on remote process
+        if (remoteMonitorService != null) {
+          remoteMonitorService.forceRemoteGc();
+          Thread.sleep(2000);
+
+          // Get memory stats after GC
+          RemoteMemoryMonitorService.RemoteMemorySnapshot afterGc =
+                  remoteMonitorService.getCurrentSnapshot();
+
+          if (afterGc != null) {
+            StringBuilder report = new StringBuilder();
+            report.append("\n");
+            report.append("╔═══════════════════════════════════════════════════════════════╗\n");
+            report.append("║         REMOTE PROCESS MEMORY LEAK ANALYSIS                  ║\n");
+            report.append("╚═══════════════════════════════════════════════════════════════╝\n\n");
+
+            report.append(String.format("Process PID: %s\n", remoteMonitorService.getConnectedPid()));
+            report.append(String.format("Heap Used: %s\n", formatBytes(afterGc.heapUsed())));
+            report.append(String.format("Old Gen Used: %s\n", formatBytes(afterGc.oldGenUsed())));
+            report.append(String.format("Young Gen Used: %s\n", formatBytes(afterGc.youngGenUsed())));
+            report.append(String.format("Metaspace: %s\n\n", formatBytes(afterGc.metaspaceUsed())));
+
+            // Old gen percentage
+            double oldGenPercent = (afterGc.oldGenUsed() * 100.0) / afterGc.heapUsed();
+            report.append(String.format("Old Gen Percentage: %.1f%%\n\n", oldGenPercent));
+
+            if (oldGenPercent > 60) {
+              report.append("🔴 CRITICAL: High old gen usage (>60%) after GC!\n");
+              report.append("💡 This indicates objects are being promoted to old gen and surviving.\n");
+              report.append("📌 Likely a memory leak in your application.\n\n");
+            } else if (oldGenPercent > 40) {
+              report.append("🟡 WARNING: Moderate old gen usage after GC.\n");
+              report.append("💡 Monitor closely for memory leak patterns.\n\n");
+            } else {
+              report.append("✅ Old gen usage looks healthy after GC.\n\n");
+            }
+
+            report.append("🔧 RECOMMENDATIONS:\n");
+            report.append("1. Review code for:\n");
+            report.append("   • Static collections that keep growing\n");
+            report.append("   • Event listeners never unregistered\n");
+            report.append("   • Caches without eviction policies\n");
+            report.append("   • ThreadLocal variables without cleanup\n");
+            report.append("2. Use a profiler like VisualVM to analyze heap dumps\n");
+            report.append("3. Check for objects that reference each other\n");
+
+            LOG.warn(report.toString());
+
+            // Show to user
+            ApplicationManager.getApplication().invokeLater(() -> {
+              Messages.showInfoMessage(
+                      project,
+                      report.toString(),
+                      "Remote Memory Leak Analysis"
+              );
+            });
+          }
+        }
+      } catch (Exception e) {
+        LOG.error("Error during remote leak analysis", e);
+      }
+    });
+  }
+
+  /**
+   * Convert remote snapshot to local format
+   */
+  private MemorySnapshot convertToLocalSnapshot(RemoteMemoryMonitorService.RemoteMemorySnapshot remote) {
+    return new MemorySnapshot(
+            remote.timestamp(),
+            remote.heapUsed(),
+            remote.heapCommitted(),
+            remote.heapMax(),
+            remote.oldGenUsed(),
+            remote.oldGenCommitted(),
+            remote.youngGenUsed(),
+            remote.metaspaceUsed()
+    );
+  }
+
+  /**
+   * Convert remote GC event to local format
+   */
+  private GcEvent convertToLocalGcEvent(RemoteMemoryMonitorService.GcEvent remote) {
+    return new GcEvent(
+            remote.timestamp(),
+            remote.gcName(),
+            remote.duration(),
+            remote.oldGenBefore(),
+            remote.oldGenAfter(),
+            remote.oldGenReclaimed()
+    );
+  }
+  public AllocationInterceptor getAllocationInterceptor() {
+    return allocationInterceptor;
+  }
+
+  // ========== ALLOCATION TRACKING METHODS ==========
+
+  private void startAllocationTracking() {
+    scheduler.scheduleAtFixedRate(() -> {
+      if (!isMonitoring.get()) return;
+
+      try {
+        processAllocationSamples();
+        analyzeAllocationPatterns();
+      } catch (Exception e) {
+        LOG.warn("Error in allocation tracking", e);
+      }
+    }, 1, 5, TimeUnit.SECONDS);
+  }
+
+  private void processAllocationSamples() {
+    List<AllocationSample> samples = new ArrayList<>();
+    AllocationSample sample;
+    while ((sample = allocationSamples.poll()) != null) {
+      samples.add(sample);
+    }
+
+    if (samples.isEmpty()) return;
+
+    Map<String, Long> aggregatedAllocations = new HashMap<>();
+    Map<String, AllocationSample> sampleMap = new HashMap<>();
+
+    for (AllocationSample s : samples) {
+      String key = String.format("%s.%s@%s:%d", s.className, s.methodName, s.fileName, s.lineNumber);
+      aggregatedAllocations.merge(key, s.size, Long::sum);
+
+      if (!sampleMap.containsKey(key)) {
+        sampleMap.put(key, s);
+      }
+    }
+
+    for (Map.Entry<String, Long> entry : aggregatedAllocations.entrySet()) {
+      AllocationSample s = sampleMap.get(entry.getKey());
+      if (s != null) {
+        stackAnalyzer.trackAllocation(
+                s.className, s.methodName, s.fileName, s.lineNumber,
+                entry.getValue(), s.stackTrace
+        );
+      }
+    }
+  }
+
+  private void analyzeAllocationPatterns() {
+    List<AllocationStackAnalyzer.LeakLocation> leaks = stackAnalyzer.getTopLeakSuspects(5);
+
+    if (!leaks.isEmpty() && !leaks.equals(lastKnownLeaks)) {
+      lastKnownLeaks = leaks;
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("\n═══════════════════════════════════════════════════════════════\n");
+      sb.append("📊 ALLOCATION ANALYSIS REPORT\n");
+      sb.append("═══════════════════════════════════════════════════════════════\n\n");
+
+      for (AllocationStackAnalyzer.LeakLocation leak : leaks) {
+        sb.append("📍 SUSPECT LOCATION:\n");
+        sb.append("   File: ").append(leak.fileName).append(":").append(leak.lineNumber).append("\n");
+        sb.append("   Class: ").append(leak.className).append("\n");
+        sb.append("   Method: ").append(leak.methodName).append("()\n");
+        sb.append("   Memory: ").append(formatBytes(leak.totalMemory)).append("\n");
+        sb.append("   Instances: ").append(leak.instanceCount).append("\n");
+        sb.append("   ─────────────────────────────────────────────────────────\n");
+      }
+
+      LOG.warn(sb.toString());
+
+      LeakAlert alert = new LeakAlert(
+              System.currentTimeMillis(),
+              LeakAlert.Severity.WARNING,
+              "Memory allocation leak suspects detected! Check logs for details.",
+              Map.of(
+                      "topLeak", leaks.get(0).fileName + ":" + leaks.get(0).lineNumber,
+                      "leakCount", leaks.size(),
+                      "topMemory", leaks.get(0).totalMemory
+              )
+      );
+      notifyLeakDetected(alert);
+    }
+  }
+
+  public List<AllocationStackAnalyzer.LeakLocation> getAllocationSuspects() {
+    return stackAnalyzer.getTopLeakSuspects(10);
+  }
+
+  public String getAllocationReport() {
+    List<AllocationStackAnalyzer.LeakLocation> leaks = getAllocationSuspects();
+    if (leaks.isEmpty()) {
+      return "No memory leak suspects detected.";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("\n╔══════════════════════════════════════════════════════════════╗\n");
+    sb.append("║         MEMORY ALLOCATION LEAK REPORT                        ║\n");
+    sb.append("╚══════════════════════════════════════════════════════════════╝\n\n");
+
+    for (int i = 0; i < Math.min(10, leaks.size()); i++) {
+      AllocationStackAnalyzer.LeakLocation leak = leaks.get(i);
+      sb.append(String.format("%d. %s:%d\n", i + 1, leak.fileName, leak.lineNumber));
+      sb.append(String.format("   %s.%s()\n", leak.className, leak.methodName));
+      sb.append(String.format("   Memory: %s (%d instances)\n",
+              formatBytes(leak.totalMemory), leak.instanceCount));
+      sb.append("   \n");
+    }
+
+    return sb.toString();
+  }
+
+  // ========== MAIN MONITORING METHODS ==========
 
   public void startMonitoring() {
     if (isMonitoring.compareAndSet(false, true)) {
-      LOG.info("Starting memory monitoring");
+      LOG.info("Starting memory monitoring with allocation tracking");
       try {
         establishBaseline();
         setupGcListener();
@@ -164,8 +587,30 @@ public final class MemoryMonitorService {
 
   public void forceGc() {
     LOG.info("Manual GC triggered");
+
+    List<AllocationStackAnalyzer.LeakLocation> beforeLeaks = getAllocationSuspects();
+
     System.gc();
     appendLog("[Manual GC] System.gc() called");
+
+    scheduler.schedule(() -> {
+      List<AllocationStackAnalyzer.LeakLocation> afterLeaks = getAllocationSuspects();
+
+      if (!afterLeaks.isEmpty()) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n⚠️ OBJECTS SURVIVED GC - POTENTIAL LEAKS ⚠️\n");
+        sb.append("═══════════════════════════════════════════════════════════\n");
+
+        for (AllocationStackAnalyzer.LeakLocation leak : afterLeaks) {
+          sb.append("📍 ").append(leak.fileName).append(":").append(leak.lineNumber).append("\n");
+          sb.append("   ").append(leak.className).append(".").append(leak.methodName).append("()\n");
+          sb.append("   Memory: ").append(formatBytes(leak.totalMemory)).append("\n");
+          sb.append("   Instances: ").append(leak.instanceCount).append("\n\n");
+        }
+
+        LOG.warn(sb.toString());
+      }
+    }, 2, TimeUnit.SECONDS);
   }
 
   public MemorySnapshot getCurrentSnapshot() {
@@ -199,45 +644,6 @@ public final class MemoryMonitorService {
     }
   }
 
-  public void removeListener(MemoryMonitorListener listener) {
-    listeners.remove(listener);
-  }
-
-  public List<GcEvent> getRecentGcEvents(int maxCount) {
-    int start = Math.max(0, gcEvents.size() - maxCount);
-    return new ArrayList<>(gcEvents.subList(start, gcEvents.size()));
-  }
-
-  public List<GcEvent> getAllGcEvents() {
-    return new ArrayList<>(gcEvents);
-  }
-
-  public void clearEvents() {
-    gcEvents.clear();
-    memorySnapshots.clear();
-    synchronized (oldGenGrowthRates) {
-      oldGenGrowthRates.clear();
-    }
-    oldGenAfterGcHistory.clear();
-    gcEfficiencyHistory.clear();
-    baselineIncreaseCount = 0;
-  }
-
-  public double getCurrentHeapGrowthPercent() {
-    return currentHeapGrowthPercent;
-  }
-
-  public double getCurrentOldGenGrowthPercent() {
-    return currentOldGenGrowthPercent;
-  }
-
-  public double getCurrentRecentGrowthRate() {
-    return currentRecentGrowthRate;
-  }
-
-  public double getCurrentGcEfficiency() {
-    return currentGcEfficiency;
-  }
 
   // ========== LEAK ANALYSIS METHODS ==========
 
@@ -253,23 +659,19 @@ public final class MemoryMonitorService {
       );
     }
 
-    // Analyze recent GC events
     List<GcEvent> recentEvents = gcEvents.subList(gcEvents.size() - Math.min(10, gcEvents.size()), gcEvents.size());
 
-    // Calculate old gen after GC trend
     long firstOldGenAfter = recentEvents.get(0).oldGenAfter();
     long lastOldGenAfter = recentEvents.get(recentEvents.size() - 1).oldGenAfter();
     long baselineTrend = lastOldGenAfter - firstOldGenAfter;
     double baselineTrendMB = baselineTrend / (1024.0 * 1024);
 
-    // Calculate average GC efficiency
     double avgEfficiency = recentEvents.stream()
             .filter(e -> e.oldGenBefore() > 0)
             .mapToDouble(e -> (double) e.oldGenReclaimed() / e.oldGenBefore() * 100)
             .average()
             .orElse(0);
 
-    // Determine if there's a leak
     boolean hasLeak = false;
     String recommendation;
     Map<String, Object> details = new HashMap<>();
@@ -280,49 +682,38 @@ public final class MemoryMonitorService {
     details.put("firstOldGenAfterMB", firstOldGenAfter / (1024.0 * 1024));
     details.put("lastOldGenAfterMB", lastOldGenAfter / (1024.0 * 1024));
 
+    List<AllocationStackAnalyzer.LeakLocation> suspects = getAllocationSuspects();
+    if (!suspects.isEmpty()) {
+      details.put("topAllocationSuspect", suspects.get(0).fileName + ":" + suspects.get(0).lineNumber);
+      details.put("suspectCount", suspects.size());
+    }
+
     if (baselineTrend > 50 * 1024 * 1024 && avgEfficiency < CRITICAL_GC_EFFICIENCY_THRESHOLD) {
       hasLeak = true;
       recommendation = "CRITICAL: Old gen baseline increased by over 50MB with very poor GC efficiency (<10%). " +
-              "This strongly indicates a severe memory leak. Check for:\n" +
-              "• Static collections that keep growing (List, Map, Set)\n" +
-              "• ThreadLocal variables without remove() calls\n" +
-              "• Unclosed resources (connections, streams, files)\n" +
-              "• Caches without eviction policies\n" +
-              "• Event listeners that are never unregistered";
+              "This strongly indicates a severe memory leak.\n\n" +
+              getSuspectRecommendation(suspects);
       details.put("severity", "CRITICAL");
     } else if (baselineTrend > 10 * 1024 * 1024 && avgEfficiency < LOW_GC_EFFICIENCY_THRESHOLD) {
       hasLeak = true;
       recommendation = "HIGH RISK: Old gen baseline is increasing with poor GC efficiency. " +
-              "Memory leak likely. Review code for:\n" +
-              "• Objects held in collections longer than needed\n" +
-              "• Inner class instances holding outer class references\n" +
-              "• Large temporary object allocations\n" +
-              "• Inefficient caching strategies";
+              "Memory leak likely.\n\n" +
+              getSuspectRecommendation(suspects);
       details.put("severity", "HIGH_RISK");
     } else if (baselineTrend > 5 * 1024 * 1024) {
       hasLeak = true;
-      recommendation = "WARNING: Old gen baseline is trending upward. Monitor closely. " +
-              "Consider reviewing:\n" +
-              "• Object lifecycle management\n" +
-              "• Collection cleanup routines\n" +
-              "• Resource cleanup in finally blocks";
+      recommendation = "WARNING: Old gen baseline is trending upward. Monitor closely.\n\n" +
+              getSuspectRecommendation(suspects);
       details.put("severity", "WARNING");
     } else if (avgEfficiency < LOW_GC_EFFICIENCY_THRESHOLD) {
-      recommendation = "Poor GC efficiency detected. Objects are moving to old generation too quickly. " +
-              "Check for:\n" +
-              "• Large object allocations that bypass young gen\n" +
-              "• Survivor space sizing issues\n" +
-              "• Premature promotion of objects";
+      recommendation = "Poor GC efficiency detected. Objects are moving to old generation too quickly.\n\n" +
+              getSuspectRecommendation(suspects);
       details.put("severity", "INFO");
     } else {
-      recommendation = "No memory leak detected. Memory usage patterns are healthy.\n" +
-              "• Old gen baseline is stable\n" +
-              "• GC efficiency is good\n" +
-              "• No abnormal growth patterns";
+      recommendation = "No memory leak detected. Memory usage patterns are healthy.";
       details.put("severity", "HEALTHY");
     }
 
-    // Add more details
     details.put("gcEfficiencyHistory", gcEfficiencyHistory);
     details.put("oldGenAfterGcHistory", oldGenAfterGcHistory);
 
@@ -334,6 +725,23 @@ public final class MemoryMonitorService {
             recommendation,
             details
     );
+  }
+
+  private String getSuspectRecommendation(List<AllocationStackAnalyzer.LeakLocation> suspects) {
+    if (suspects.isEmpty()) {
+      return "• No specific allocation suspects identified. Consider using a profiler.\n";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("📍 SUSPECTED LEAK LOCATIONS:\n");
+    for (int i = 0; i < Math.min(3, suspects.size()); i++) {
+      AllocationStackAnalyzer.LeakLocation leak = suspects.get(i);
+      sb.append(String.format("   %d. %s:%d\n", i + 1, leak.fileName, leak.lineNumber));
+      sb.append(String.format("      %s.%s()\n", leak.className, leak.methodName));
+      sb.append(String.format("      Memory: %s (%d instances)\n",
+              formatBytes(leak.totalMemory), leak.instanceCount));
+    }
+    return sb.toString();
   }
 
   public String getFormattedLeakAnalysis() {
@@ -365,24 +773,11 @@ public final class MemoryMonitorService {
     return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
   }
 
-  public String getMemorySummary() {
-    MemorySnapshot snapshot = getCurrentSnapshot();
-    return String.format(
-            "Heap: %s / %s (%.1f%%), Old Gen: %s, Young Gen: %s",
-            formatBytes(snapshot.heapUsed()),
-            formatBytes(snapshot.heapCommitted()),
-            snapshot.heapCommitted() > 0 ? (snapshot.heapUsed() * 100.0) / snapshot.heapCommitted() : 0,
-            formatBytes(snapshot.oldGenUsed()),
-            formatBytes(snapshot.youngGenUsed())
-    );
-  }
-
   // ========== PRIVATE METHODS ==========
 
   private void establishBaseline() {
     LOG.info("Establishing baseline memory usage...");
 
-    // Run GC to get clean state
     System.gc();
     try {
       Thread.sleep(2000);
@@ -456,12 +851,10 @@ public final class MemoryMonitorService {
 
       gcEvents.add(event);
 
-      // Keep only last 200 events
       while (gcEvents.size() > 200) {
         gcEvents.remove(0);
       }
 
-      // Track baseline trend for leak detection
       if (previousOldGenAfterGc > 0) {
         long baselineChange = event.oldGenAfter() - previousOldGenAfterGc;
         if (baselineChange > 0) {
@@ -508,151 +901,85 @@ public final class MemoryMonitorService {
   }
 
   private void startPeriodicMonitoring() {
+    LOG.info("Starting periodic monitoring with allocation tracking...");
+
     scheduler.scheduleAtFixedRate(() -> {
-      if (!isMonitoring.get()) return;
+      if (!isMonitoring.get()) {
+        LOG.debug("Monitoring is not active, skipping...");
+        return;
+      }
 
       try {
         MemorySnapshot snapshot = getCurrentSnapshot();
-        memorySnapshots.add(snapshot);
 
-        while (memorySnapshots.size() > 1000) {
-          memorySnapshots.remove(0);
-        }
+        if (memorySnapshots.size() % 5 == 0) {
+          allocationInterceptor.analyzeSurvivors();
 
-        // Calculate growth percentages
-        currentHeapGrowthPercent = baselineUsedHeap > 0 ?
-                ((snapshot.heapUsed() - baselineUsedHeap) * 100.0) / baselineUsedHeap : 0;
-
-        currentOldGenGrowthPercent = baselineOldGen > 0 ?
-                ((snapshot.oldGenUsed() - baselineOldGen) * 100.0) / baselineOldGen : 0;
-
-        // Calculate recent growth rate
-        synchronized (oldGenGrowthRates) {
-          oldGenGrowthRates.add((double) snapshot.oldGenUsed());
-          if (oldGenGrowthRates.size() > 10) {
-            oldGenGrowthRates.remove(0);
-          }
-
-          if (oldGenGrowthRates.size() >= 2) {
-            double first = oldGenGrowthRates.get(0);
-            double last = oldGenGrowthRates.get(oldGenGrowthRates.size() - 1);
-            currentRecentGrowthRate = first > 0 ? ((last - first) / first) * 100 : 0;
-          } else {
-            currentRecentGrowthRate = 0;
-          }
-        }
-
-        // Update GC efficiency
-        currentGcEfficiency = calculateGcEfficiency();
-
-        // Check memory threshold warning
-        double heapUsagePercent = snapshot.heapCommitted() > 0 ?
-                (snapshot.heapUsed() * 100.0) / snapshot.heapCommitted() : 0;
-        double oldGenUsagePercent = snapshot.oldGenCommitted() > 0 ?
-                (snapshot.oldGenUsed() * 100.0) / snapshot.oldGenCommitted() : 0;
-
-        if (heapUsagePercent > 90 || oldGenUsagePercent > 90) {
-          notifyMemoryThresholdWarning(heapUsagePercent, oldGenUsagePercent);
-        }
-
-        // Notify listeners
-        notifyMemoryUpdate(snapshot);
-        notifyMetricsUpdate(currentHeapGrowthPercent, currentOldGenGrowthPercent,
-                currentRecentGrowthRate, currentGcEfficiency);
-
-        // Check for rapid growth
-        if (currentRecentGrowthRate > RAPID_GROWTH_THRESHOLD) {
-          RapidGrowthAlert alert = new RapidGrowthAlert(
-                  System.currentTimeMillis(),
-                  currentRecentGrowthRate,
-                  currentOldGenGrowthPercent,
-                  currentGcEfficiency,
-                  snapshot.oldGenUsed(),
-                  baselineOldGen
-          );
-          notifyRapidGrowth(alert);
-        }
-
-        // Check for leaks
-        checkForLeaks(snapshot, currentHeapGrowthPercent, currentOldGenGrowthPercent,
-                currentRecentGrowthRate, currentGcEfficiency);
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(String.format(
-                  "Memory Status - Heap: %s (%.1f%%), Old Gen: %s (%.1f%%), GC Eff: %.1f%%",
-                  formatBytes(snapshot.heapUsed()), currentHeapGrowthPercent,
-                  formatBytes(snapshot.oldGenUsed()), currentOldGenGrowthPercent,
-                  currentGcEfficiency
+          LOG.info(String.format("📊 Heap Status: %s (Old Gen: %s, Growth: %+.2f MB from baseline)",
+                  formatBytes(snapshot.heapUsed()),
+                  formatBytes(snapshot.oldGenUsed()),
+                  (snapshot.heapUsed() - baselineUsedHeap) / (1024.0 * 1024)
           ));
         }
 
-      } catch (Exception e) {
-        LOG.warn("Error during memory monitoring", e);
-        notifyMonitoringError(e, "periodicMonitoring");
-      }
-    }, 5, 5, TimeUnit.SECONDS);
+        memorySnapshots.add(snapshot);
 
-    // Schedule periodic leak analysis
-    scheduler.scheduleAtFixedRate(() -> {
-      if (isMonitoring.get() && gcEvents.size() >= 5) {
-        try {
-          LeakAnalysisReport report = analyzeLeakPattern();
-          notifyLeakAnalysisReport(report);
-        } catch (Exception e) {
-          LOG.warn("Error during leak analysis", e);
+        if (lastHeapSize > 0) {
+          long growth = snapshot.heapUsed() - lastHeapSize;
+
+          if (growth > 0) {
+            LOG.info(String.format("📈 Heap growth detected: +%s (from %s to %s)",
+                    formatBytes(growth),
+                    formatBytes(lastHeapSize),
+                    formatBytes(snapshot.heapUsed())
+            ));
+          }
+
+          if (growth > 1024 * 1024) {
+            LOG.warn(String.format("⚠️ SIGNIFICANT HEAP GROWTH: +%s! Tracking allocation...",
+                    formatBytes(growth)));
+
+            trackCurrentAllocation();
+
+            List<AllocationTracker.AllocationInfo> suspects =
+                    allocationTracker.getTopSuspects(5);
+
+            if (!suspects.isEmpty()) {
+              LOG.warn("🚨 POTENTIAL MEMORY LEAK LOCATIONS 🚨");
+              for (AllocationTracker.AllocationInfo info : suspects) {
+                LOG.warn(String.format("   📍 %s:%d - %s.%s() (%s, %d allocations)",
+                        info.fileName != null ? info.fileName : "unknown",
+                        info.lineNumber,
+                        info.className,
+                        info.methodName,
+                        formatBytes(info.totalMemory.get()),
+                        info.allocationCount.get()));
+              }
+            } else {
+              LOG.warn("⚠️ No allocation suspects found, but heap grew!");
+              logCurrentStack();
+            }
+          }
         }
+
+        allocationTracker.setLastHeapSize(snapshot.heapUsed());
+        lastHeapSize = snapshot.heapUsed();
+
+      } catch (Exception e) {
+        LOG.error("Error during memory monitoring", e);
       }
-    }, 30, 30, TimeUnit.SECONDS);
+    }, 2, 2, TimeUnit.SECONDS);
   }
 
-  private void checkForLeaks(MemorySnapshot snapshot, double heapGrowthPercent,
-                             double oldGenGrowthPercent, double recentGrowthRate,
-                             double gcEfficiency) {
-
-    if (oldGenGrowthPercent > HIGH_RISK_GROWTH_THRESHOLD &&
-            gcEfficiency < CRITICAL_GC_EFFICIENCY_THRESHOLD) {
-
-      LeakAlert alert = new LeakAlert(
-              System.currentTimeMillis(),
-              LeakAlert.Severity.HIGH_RISK,
-              "HIGH RISK: Old gen growing >50% with very poor GC efficiency! Memory leak detected!",
-              Map.of(
-                      "oldGenGrowth", oldGenGrowthPercent,
-                      "gcEfficiency", gcEfficiency,
-                      "heapUsed", formatBytes(snapshot.heapUsed()),
-                      "oldGenUsed", formatBytes(snapshot.oldGenUsed()),
-                      "heapGrowth", heapGrowthPercent,
-                      "recentGrowthRate", recentGrowthRate
-              )
-      );
-      notifyLeakDetected(alert);
-
-    } else if (oldGenGrowthPercent > WARNING_GROWTH_THRESHOLD &&
-            gcEfficiency < LOW_GC_EFFICIENCY_THRESHOLD) {
-
-      LeakAlert alert = new LeakAlert(
-              System.currentTimeMillis(),
-              LeakAlert.Severity.WARNING,
-              "WARNING: Old gen growing steadily with poor GC efficiency. Potential memory leak.",
-              Map.of(
-                      "oldGenGrowth", oldGenGrowthPercent,
-                      "gcEfficiency", gcEfficiency,
-                      "recentGrowthRate", recentGrowthRate
-              )
-      );
-      notifyLeakDetected(alert);
-
-    } else if (oldGenGrowthPercent > WARNING_GROWTH_THRESHOLD) {
-      LeakAlert alert = new LeakAlert(
-              System.currentTimeMillis(),
-              LeakAlert.Severity.INFO,
-              "INFO: Old gen growth detected. Monitor closely for memory leak patterns.",
-              Map.of(
-                      "oldGenGrowth", oldGenGrowthPercent,
-                      "currentOldGen", formatBytes(snapshot.oldGenUsed())
-              )
-      );
-      notifyLeakDetected(alert);
+  private void logCurrentStack() {
+    try {
+      StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+      LOG.warn("Current stack trace:");
+      for (int i = 0; i < Math.min(10, stackTrace.length); i++) {
+        LOG.warn("  " + stackTrace[i].toString());
+      }
+    } catch (Exception e) {
+      LOG.debug("Error logging stack", e);
     }
   }
 
@@ -688,29 +1015,13 @@ public final class MemoryMonitorService {
                         "gcCount", last10.size(),
                         "firstOldGen", formatBytes(firstValue),
                         "lastOldGen", formatBytes(lastValue),
-                        "trend", "increasing"
+                        "trend", "increasing",
+                        "suspects", getAllocationSuspects()
                 )
         );
         notifyLeakDetected(alert);
       }
     }
-  }
-
-  private double calculateGcEfficiency() {
-    if (gcEvents.isEmpty()) return 100.0;
-
-    long totalReclaimed = 0;
-    long totalOldGenBefore = 0;
-
-    for (GcEvent event : gcEvents) {
-      if (event.oldGenReclaimed() > 0) {
-        totalReclaimed += event.oldGenReclaimed();
-        totalOldGenBefore += event.oldGenBefore();
-      }
-    }
-
-    return totalOldGenBefore > 0 ?
-            (totalReclaimed * 100.0) / totalOldGenBefore : 100.0;
   }
 
   private MemoryUsage getOldGenUsage() {
@@ -752,7 +1063,6 @@ public final class MemoryMonitorService {
   }
 
   private void appendLog(String message) {
-    // For debugging
     if (LOG.isDebugEnabled()) {
       LOG.debug(message);
     }
@@ -782,22 +1092,14 @@ public final class MemoryMonitorService {
 
   private void notifyLeakDetected(LeakAlert alert) {
     LOG.warn("Leak detected: " + alert.message());
+    if (alert.details().containsKey("suspects")) {
+      LOG.warn(getAllocationReport());
+    }
     for (MemoryMonitorListener listener : listeners) {
       try {
         listener.onLeakDetected(alert);
       } catch (Exception e) {
         LOG.warn("Error notifying listener of leak detection", e);
-      }
-    }
-  }
-
-  private void notifyRapidGrowth(RapidGrowthAlert alert) {
-    LOG.warn("Rapid growth detected: " + alert.growthRate() + "%");
-    for (MemoryMonitorListener listener : listeners) {
-      try {
-        listener.onRapidGrowthDetected(alert);
-      } catch (Exception e) {
-        LOG.warn("Error notifying listener of rapid growth", e);
       }
     }
   }
@@ -822,38 +1124,6 @@ public final class MemoryMonitorService {
     }
   }
 
-  private void notifyMemoryThresholdWarning(double heapUsagePercent, double oldGenUsagePercent) {
-    for (MemoryMonitorListener listener : listeners) {
-      try {
-        listener.onMemoryThresholdWarning(heapUsagePercent, oldGenUsagePercent);
-      } catch (Exception e) {
-        LOG.warn("Error notifying listener of threshold warning", e);
-      }
-    }
-  }
-
-  private void notifyLeakAnalysisReport(LeakAnalysisReport report) {
-    for (MemoryMonitorListener listener : listeners) {
-      try {
-        listener.onLeakAnalysisReport(report);
-      } catch (Exception e) {
-        LOG.warn("Error notifying listener of leak analysis", e);
-      }
-    }
-  }
-
-  private void notifyMetricsUpdate(double heapGrowthPercent, double oldGenGrowthPercent,
-                                   double recentGrowthRate, double gcEfficiency) {
-    for (MemoryMonitorListener listener : listeners) {
-      try {
-        listener.onMetricsUpdate(heapGrowthPercent, oldGenGrowthPercent,
-                recentGrowthRate, gcEfficiency);
-      } catch (Exception e) {
-        LOG.warn("Error notifying listener of metrics update", e);
-      }
-    }
-  }
-
   private void notifyMonitoringError(Throwable error, String context) {
     for (MemoryMonitorListener listener : listeners) {
       try {
@@ -861,6 +1131,113 @@ public final class MemoryMonitorService {
       } catch (Exception e) {
         LOG.warn("Error notifying listener of monitoring error", e);
       }
+    }
+  }
+
+  private void trackCurrentAllocation() {
+    try {
+      StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+
+      for (StackTraceElement element : stackTrace) {
+        String className = element.getClassName();
+        if (!className.startsWith("java.") &&
+                !className.startsWith("javax.") &&
+                !className.startsWith("sun.") &&
+                !className.startsWith("com.intellij.") &&
+                !className.startsWith("org.cakk.")) {
+
+          allocationTracker.trackAllocation(
+                  className,
+                  element.getMethodName(),
+                  element.getFileName(),
+                  element.getLineNumber(),
+                  0,
+                  getStackTraceString(stackTrace)
+          );
+          break;
+        }
+      }
+    } catch (Exception e) {
+      LOG.debug("Error tracking allocation: " + e.getMessage());
+    }
+  }
+
+  private String getStackTraceString(StackTraceElement[] stackTrace) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < Math.min(10, stackTrace.length); i++) {
+      sb.append(stackTrace[i].toString()).append("\n");
+    }
+    return sb.toString();
+  }
+
+  public void forceDetection() {
+    LOG.info("Forcing memory leak detection...");
+
+    System.gc();
+
+    try {
+      Thread.sleep(2000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
+    if (lastHeapSize > 0) {
+      long simulatedGrowth = 2 * 1024 * 1024;
+      LOG.warn(String.format("SIMULATED: Heap grew by %s", formatBytes(simulatedGrowth)));
+
+      trackCurrentAllocation();
+
+      List<AllocationTracker.AllocationInfo> suspects =
+              allocationTracker.getTopSuspects(5);
+
+      if (!suspects.isEmpty()) {
+        LOG.warn("🚨 POTENTIAL MEMORY LEAK LOCATIONS 🚨");
+        for (AllocationTracker.AllocationInfo info : suspects) {
+          LOG.warn(String.format("   📍 %s:%d - %s.%s() (%s)",
+                  info.fileName, info.lineNumber,
+                  info.className, info.methodName,
+                  formatBytes(info.totalMemory.get())));
+        }
+      } else {
+        LOG.warn("No allocation suspects found");
+        logCurrentStack();
+      }
+    }
+  }
+
+  public void forceLeakDetection() {
+    LOG.info("Forcing memory leak detection...");
+
+    System.gc();
+
+    try {
+      Thread.sleep(2000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
+    allocationInterceptor.analyzeSurvivors();
+
+    List<AllocationInterceptor.AllocationInfo> suspects =
+            allocationInterceptor.getTopSuspects(10);
+
+    if (!suspects.isEmpty()) {
+      StringBuilder report = new StringBuilder();
+      report.append("\n🔍 MEMORY LEAK SUSPECTS 🔍\n");
+      report.append("═══════════════════════════════════════════════════════════\n");
+
+      for (AllocationInterceptor.AllocationInfo info : suspects) {
+        report.append(String.format("📍 %s:%d\n", info.fileName, info.lineNumber));
+        report.append(String.format("   %s.%s()\n", info.className, info.methodName));
+        report.append(String.format("   Memory: %s (%d allocations)\n",
+                formatBytes(info.totalMemory.get()), info.allocationCount.get()));
+        report.append(String.format("   Surviving objects: %d\n", info.getSurvivingObjects()));
+        report.append("\n");
+      }
+
+      LOG.warn(report.toString());
+    } else {
+      LOG.info("No memory leak suspects found");
     }
   }
 }

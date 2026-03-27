@@ -40,12 +40,6 @@ public class MemoryMonitorToolWindow extends SimpleToolWindowPanel {
   private ScheduledExecutorService remoteUpdater;
   private boolean isRemoteMode = false;
 
-  // Metrics tracking
-  private double currentHeapGrowth = 0;
-  private double currentOldGenGrowth = 0;
-  private double currentRecentGrowthRate = 0;
-  private double currentGcEfficiency = 0;
-
   public MemoryMonitorToolWindow(@NotNull Project project) {
     super(true, true);
     this.project = project;
@@ -336,10 +330,6 @@ public class MemoryMonitorToolWindow extends SimpleToolWindowPanel {
                                   double recentGrowthRate, double gcEfficiency) {
         SwingUtilities.invokeLater(() -> {
           if (!isRemoteMode) {
-            currentHeapGrowth = heapGrowthPercent;
-            currentOldGenGrowth = oldGenGrowthPercent;
-            currentRecentGrowthRate = recentGrowthRate;
-            currentGcEfficiency = gcEfficiency;
             statsPanel.updateHeapGrowth(heapGrowthPercent);
             statsPanel.updateOldGenGrowth(oldGenGrowthPercent);
             statsPanel.updateRecentGrowthRate(recentGrowthRate);

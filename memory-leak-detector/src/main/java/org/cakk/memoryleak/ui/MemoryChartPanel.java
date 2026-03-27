@@ -16,89 +16,125 @@ public class MemoryChartPanel extends JPanel {
   private static final int MAX_DATA_POINTS = 200;
   private final List<DataPoint> heapData = new ArrayList<>();
   private final List<DataPoint> oldGenData = new ArrayList<>();
+  private final List<DataPoint> youngGenData = new ArrayList<>();
   private long maxHeap = 0;
   private long maxOldGen = 0;
+  private long maxYoungGen = 0;
+
+  // Checkbox states
+  private boolean showHeap = true;
+  private boolean showOldGen = true;
+  private boolean showYoungGen = true;
+
+  // Checkbox components
+  private final JCheckBox heapCheckbox;
+  private final JCheckBox oldGenCheckbox;
+  private final JCheckBox youngGenCheckbox;
+
+  private final JPanel chartPanel;
 
   public MemoryChartPanel() {
     setBackground(JBColor.background());
     setBorder(JBUI.Borders.empty(5));
-    setPreferredSize(new Dimension(800, 300));
+    setLayout(new BorderLayout());
+    setPreferredSize(new Dimension(800, 380));
+
+    // Create checkbox panel
+    JPanel checkboxPanel = createCheckboxPanel();
+
+    // Initialize checkboxes
+    heapCheckbox = new JCheckBox("Heap Used", showHeap);
+    oldGenCheckbox = new JCheckBox("Old Gen", showOldGen);
+    youngGenCheckbox = new JCheckBox("Young Gen", showYoungGen);
+
+    // Set checkbox colors to match chart lines
+    heapCheckbox.setForeground(new JBColor(new Color(0, 100, 255), new Color(80, 140, 255)));
+    oldGenCheckbox.setForeground(new JBColor(new Color(255, 80, 80), new Color(255, 120, 120)));
+    youngGenCheckbox.setForeground(new JBColor(new Color(80, 255, 80), new Color(120, 255, 120)));
+
+    // Add checkboxes to panel
+    checkboxPanel.add(heapCheckbox);
+    checkboxPanel.add(oldGenCheckbox);
+    checkboxPanel.add(youngGenCheckbox);
+
+    // Add action listeners
+    heapCheckbox.addActionListener(e -> {
+      showHeap = heapCheckbox.isSelected();
+      recalculateMaxValues();
+      repaint();
+    });
+
+    oldGenCheckbox.addActionListener(e -> {
+      showOldGen = oldGenCheckbox.isSelected();
+      recalculateMaxValues();
+      repaint();
+    });
+
+    youngGenCheckbox.addActionListener(e -> {
+      showYoungGen = youngGenCheckbox.isSelected();
+      recalculateMaxValues();
+      repaint();
+    });
+
+    // Create chart panel
+    chartPanel = new JPanel() {
+      @Override
+      protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        drawChart(g);
+      }
+    };
+    chartPanel.setBackground(JBColor.background());
+    chartPanel.setPreferredSize(new Dimension(800, 300));
+
+    // Add components to main panel
+    add(checkboxPanel, BorderLayout.NORTH);
+    add(chartPanel, BorderLayout.CENTER);
   }
 
-  // ========== PUBLIC METHODS ==========
-
-  /**
-   * Add data point from local monitoring
-   */
-  public void addLocalDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
-    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
+  private JPanel createCheckboxPanel() {
+    JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    panel.setBackground(JBColor.background());
+    panel.setBorder(JBUI.Borders.empty(5, 10, 5, 10));
+    return panel;
   }
 
-  /**
-   * Add data point from remote monitoring
-   * FIXED: Use RemoteMemorySnapshot, not MemorySnapshot
-   */
-  public void addRemoteDataPoint(RemoteMemoryMonitorService.RemoteMemorySnapshot snapshot) {
-    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
-  }
-
-  /**
-   * Add data point from legacy method (for backward compatibility)
-   */
-  public void addDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
-    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed());
-  }
-
-  /**
-   * Core method to add data points
-   */
-  private void addDataPoint(long heapUsed, long oldGenUsed) {
-    long timestamp = System.currentTimeMillis();
-    heapData.add(new DataPoint(timestamp, heapUsed));
-    oldGenData.add(new DataPoint(timestamp, oldGenUsed));
-
-    // Trim data if exceeds max points
-    while (heapData.size() > MAX_DATA_POINTS) {
-      heapData.remove(0);
-    }
-    while (oldGenData.size() > MAX_DATA_POINTS) {
-      oldGenData.remove(0);
-    }
-
-    // Update max values for scaling
-    maxHeap = Math.max(maxHeap, heapUsed);
-    maxOldGen = Math.max(maxOldGen, oldGenUsed);
-
-    repaint();
-  }
-
-  /**
-   * Clear all data points
-   */
-  public void clear() {
-    heapData.clear();
-    oldGenData.clear();
+  private void recalculateMaxValues() {
     maxHeap = 0;
     maxOldGen = 0;
-    repaint();
+    maxYoungGen = 0;
+
+    if (showHeap) {
+      for (DataPoint dp : heapData) {
+        maxHeap = Math.max(maxHeap, dp.value());
+      }
+    }
+
+    if (showOldGen) {
+      for (DataPoint dp : oldGenData) {
+        maxOldGen = Math.max(maxOldGen, dp.value());
+      }
+    }
+
+    if (showYoungGen) {
+      for (DataPoint dp : youngGenData) {
+        maxYoungGen = Math.max(maxYoungGen, dp.value());
+      }
+    }
   }
 
-  // ========== PAINTING METHODS ==========
-
-  @Override
-  protected void paintComponent(Graphics g) {
-    super.paintComponent(g);
+  private void drawChart(Graphics g) {
     Graphics2D g2 = (Graphics2D) g.create();
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-    int width = getWidth() - 100;
-    int height = getHeight() - 60;
+    int width = chartPanel.getWidth() - 100;
+    int height = chartPanel.getHeight() - 60;
     int startX = 60;
     int startY = 30;
 
     // Draw background
     g2.setColor(JBColor.background());
-    g2.fillRect(0, 0, getWidth(), getHeight());
+    g2.fillRect(0, 0, chartPanel.getWidth(), chartPanel.getHeight());
 
     // Draw axes
     g2.setColor(JBColor.border());
@@ -117,8 +153,13 @@ public class MemoryChartPanel extends JPanel {
     g2.drawString("Memory (MB)", 10, startY + height / 2);
     g2.drawString("Time (seconds)", startX + width / 2, startY + height + 20);
 
+    // Calculate max value for Y-axis scaling based on visible datasets
+    long maxValue = 0;
+    if (showHeap) maxValue = Math.max(maxValue, maxHeap);
+    if (showOldGen) maxValue = Math.max(maxValue, maxOldGen);
+    if (showYoungGen) maxValue = Math.max(maxValue, maxYoungGen);
+
     // Draw Y-axis labels
-    long maxValue = Math.max(maxHeap, maxOldGen);
     if (maxValue > 0) {
       for (int i = 0; i <= 4; i++) {
         long labelValue = (maxValue * i) / 4;
@@ -127,21 +168,134 @@ public class MemoryChartPanel extends JPanel {
       }
     }
 
-    // Draw data - FIXED: Pass correct max values
-    if (!heapData.isEmpty() && maxHeap > 0) {
+    // Draw data based on checkbox states
+    if (showHeap && !heapData.isEmpty() && maxHeap > 0) {
       drawLineChart(g2, heapData, new JBColor(new Color(0, 100, 255), new Color(80, 140, 255)),
               startX, startY, width, height, maxHeap);
     }
-    if (!oldGenData.isEmpty() && maxOldGen > 0) {
+    if (showOldGen && !oldGenData.isEmpty() && maxOldGen > 0) {
       drawLineChart(g2, oldGenData, new JBColor(new Color(255, 80, 80), new Color(255, 120, 120)),
               startX, startY, width, height, maxOldGen);
     }
+    if (showYoungGen && !youngGenData.isEmpty() && maxYoungGen > 0) {
+      drawLineChart(g2, youngGenData, new JBColor(new Color(80, 255, 80), new Color(120, 255, 120)),
+              startX, startY, width, height, maxYoungGen);
+    }
 
-    // Draw legend
+    // Draw legend with checkboxes
     drawLegend(g2, startX + width - 120, startY);
 
     g2.dispose();
   }
+
+  // ========== PUBLIC METHODS ==========
+
+  /**
+   * Add data point from local monitoring
+   */
+  public void addLocalDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed(), snapshot.youngGenUsed());
+  }
+
+  /**
+   * Add data point from remote monitoring
+   */
+  public void addRemoteDataPoint(RemoteMemoryMonitorService.RemoteMemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed(), snapshot.youngGenUsed());
+  }
+
+  /**
+   * Add data point from legacy method (for backward compatibility)
+   */
+  public void addDataPoint(MemoryMonitorService.MemorySnapshot snapshot) {
+    addDataPoint(snapshot.heapUsed(), snapshot.oldGenUsed(), snapshot.youngGenUsed());
+  }
+
+  /**
+   * Core method to add data points
+   */
+  private void addDataPoint(long heapUsed, long oldGenUsed, long youngGenUsed) {
+    long timestamp = System.currentTimeMillis();
+    heapData.add(new DataPoint(timestamp, heapUsed));
+    oldGenData.add(new DataPoint(timestamp, oldGenUsed));
+    youngGenData.add(new DataPoint(timestamp, youngGenUsed));
+
+    // Trim data if exceeds max points
+    while (heapData.size() > MAX_DATA_POINTS) {
+      heapData.remove(0);
+    }
+    while (oldGenData.size() > MAX_DATA_POINTS) {
+      oldGenData.remove(0);
+    }
+    while (youngGenData.size() > MAX_DATA_POINTS) {
+      youngGenData.remove(0);
+    }
+
+    // Update max values for scaling (only for visible datasets)
+    if (showHeap) {
+      maxHeap = Math.max(maxHeap, heapUsed);
+    }
+    if (showOldGen) {
+      maxOldGen = Math.max(maxOldGen, oldGenUsed);
+    }
+    if (showYoungGen) {
+      maxYoungGen = Math.max(maxYoungGen, youngGenUsed);
+    }
+
+    chartPanel.repaint();
+  }
+
+  /**
+   * Clear all data points
+   */
+  public void clear() {
+    heapData.clear();
+    oldGenData.clear();
+    youngGenData.clear();
+    maxHeap = 0;
+    maxOldGen = 0;
+    maxYoungGen = 0;
+    chartPanel.repaint();
+  }
+
+  /**
+   * Get the checkbox for heap display
+   */
+  public JCheckBox getHeapCheckbox() {
+    return heapCheckbox;
+  }
+
+  /**
+   * Get the checkbox for old gen display
+   */
+  public JCheckBox getOldGenCheckbox() {
+    return oldGenCheckbox;
+  }
+
+  /**
+   * Get the checkbox for young gen display
+   */
+  public JCheckBox getYoungGenCheckbox() {
+    return youngGenCheckbox;
+  }
+
+  /**
+   * Set which metrics to display programmatically
+   */
+  public void setDisplayOptions(boolean showHeap, boolean showOldGen, boolean showYoungGen) {
+    this.showHeap = showHeap;
+    this.showOldGen = showOldGen;
+    this.showYoungGen = showYoungGen;
+
+    if (heapCheckbox != null) heapCheckbox.setSelected(showHeap);
+    if (oldGenCheckbox != null) oldGenCheckbox.setSelected(showOldGen);
+    if (youngGenCheckbox != null) youngGenCheckbox.setSelected(showYoungGen);
+
+    recalculateMaxValues();
+    chartPanel.repaint();
+  }
+
+  // ========== PAINTING METHODS ==========
 
   private void drawLineChart(Graphics2D g2, List<DataPoint> data, Color color,
                              int startX, int startY, int width, int height, long maxValue) {
@@ -172,17 +326,31 @@ public class MemoryChartPanel extends JPanel {
   }
 
   private void drawLegend(Graphics2D g2, int x, int y) {
-    // Heap legend
-    g2.setColor(new JBColor(new Color(0, 100, 255), new Color(80, 140, 255)));
-    g2.fillRect(x, y, 20, 10);
-    g2.setColor(JBColor.foreground());
-    g2.drawString("Heap Used", x + 25, y + 10);
+    int currentY = y;
 
-    // Old Gen legend
-    g2.setColor(new JBColor(new Color(255, 80, 80), new Color(255, 120, 120)));
-    g2.fillRect(x, y + 20, 20, 10);
-    g2.setColor(JBColor.foreground());
-    g2.drawString("Old Gen", x + 25, y + 30);
+    // Only show legend items for visible datasets
+    if (showHeap) {
+      g2.setColor(new JBColor(new Color(0, 100, 255), new Color(80, 140, 255)));
+      g2.fillRect(x, currentY, 20, 10);
+      g2.setColor(JBColor.foreground());
+      g2.drawString("Heap Used", x + 25, currentY + 10);
+      currentY += 20;
+    }
+
+    if (showOldGen) {
+      g2.setColor(new JBColor(new Color(255, 80, 80), new Color(255, 120, 120)));
+      g2.fillRect(x, currentY, 20, 10);
+      g2.setColor(JBColor.foreground());
+      g2.drawString("Old Gen", x + 25, currentY + 10);
+      currentY += 20;
+    }
+
+    if (showYoungGen) {
+      g2.setColor(new JBColor(new Color(80, 255, 80), new Color(120, 255, 120)));
+      g2.fillRect(x, currentY, 20, 10);
+      g2.setColor(JBColor.foreground());
+      g2.drawString("Young Gen", x + 25, currentY + 10);
+    }
   }
 
   private String formatBytes(long bytes) {
