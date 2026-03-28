@@ -1,26 +1,29 @@
 // src/main/java/org/cakk/unusedcode/actions/DetectUnusedCodeAction.java
 package org.cakk.unusedcode.actions;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.psi.*;
 import org.cakk.unusedcode.models.DuplicateImport;
 import org.cakk.unusedcode.models.UnusedClass;
 import org.cakk.unusedcode.models.UnusedImport;
 import org.cakk.unusedcode.models.UnusedMethod;
 import org.cakk.unusedcode.services.UnusedCodeAnalysisService;
-import org.cakk.unusedcode.ui.UnusedCodeToolWindow;
+import org.cakk.unusedcode.ui.UnusedCodeToolWindowFactory;
+import org.cakk.unusedcode.ui.UnusedCodeToolWindowPanel;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.List;
-import java.util.Map;
-
 
 public class DetectUnusedCodeAction extends AnAction {
 
@@ -29,43 +32,60 @@ public class DetectUnusedCodeAction extends AnAction {
     Project project = e.getProject();
     if (project == null) return;
 
-    // Get the selected elements
+    // Get the panel from the project (created by the tool window factory)
+    UnusedCodeToolWindowPanel panel = project.getUserData(UnusedCodeToolWindowFactory.KEY);
+    if (panel == null) {
+      // If the tool window has never been opened, show the window first to create the panel
+      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Unused Code Detector");
+      if (toolWindow != null) {
+        toolWindow.show();
+        // Try again after a short delay (the factory will have created the panel)
+        SwingUtilities.invokeLater(() -> {
+          UnusedCodeToolWindowPanel p = project.getUserData(UnusedCodeToolWindowFactory.KEY);
+          if (p != null) {
+            performAnalysis(e, p);
+          } else {
+            Messages.showErrorDialog(project, "Tool window not initialized. Please open it manually once.", "Error");
+          }
+        });
+        return;
+      } else {
+        Messages.showErrorDialog(project, "Tool window not found. Please restart the IDE.", "Error");
+        return;
+      }
+    }
+
+    performAnalysis(e, panel);
+  }
+
+  private void performAnalysis(@NotNull AnActionEvent e, UnusedCodeToolWindowPanel panel) {
+    Project project = e.getProject();
+    if (project == null) return;
+
     VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
     PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
-
-    // Get PsiDirectory if it's a directory
     PsiDirectory psiDirectory = null;
     if (virtualFile != null && virtualFile.isDirectory()) {
       psiDirectory = PsiManager.getInstance(project).findDirectory(virtualFile);
     }
 
-    // Show the tool window
-    UnusedCodeToolWindow toolWindow = UnusedCodeToolWindow.getInstance(project);
-    if (toolWindow == null) {
-      Messages.showErrorDialog(project, "Tool window not initialized", "Error");
-      return;
-    }
-
-    toolWindow.show();
-    toolWindow.clearResults();
+    panel.clearResults();
+    panel.setStatus("Analyzing...");
 
     UnusedCodeAnalysisService analysisService = new UnusedCodeAnalysisService(project);
 
-    // Determine what was selected and analyze accordingly
+    // Full analysis for a directory
     if (psiDirectory != null && isJavaSourceDirectory(psiDirectory, project)) {
-      // Right-clicked on a Java source folder - do full analysis (classes, methods, imports)
-      toolWindow.setStatus("Analyzing directory: " + psiDirectory.getName());
-      analyzeDirectory(analysisService, psiDirectory, toolWindow, project);
+      panel.setStatus("Analyzing directory: " + psiDirectory.getName());
+      analyzeDirectory(analysisService, psiDirectory, panel, project);
     }
+    // Single Java file → imports only
     else if (psiFile instanceof PsiJavaFile) {
-      // Right-clicked on a Java file - do imports only
-      toolWindow.setStatus("Analyzing imports in file: " + psiFile.getName());
-      analyzeFileImportsOnly(analysisService, (PsiJavaFile) psiFile, toolWindow);
+      panel.setStatus("Analyzing imports in file: " + psiFile.getName());
+      analyzeFileImportsOnly(analysisService, (PsiJavaFile) psiFile, panel);
     }
     else {
-      // Disabled for other selections
-      toolWindow.setStatus("Feature disabled: Please select a Java source folder or a Java file");
-      toolWindow.show();
+      panel.setStatus("Feature disabled: Please select a Java source folder or a Java file");
     }
   }
 
@@ -77,11 +97,8 @@ public class DetectUnusedCodeAction extends AnAction {
       return;
     }
 
-    // Get the selected elements
     VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
     PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
-
-    // Get PsiDirectory from VirtualFile if it's a directory
     PsiDirectory psiDirectory = null;
     if (virtualFile != null && virtualFile.isDirectory()) {
       psiDirectory = PsiManager.getInstance(project).findDirectory(virtualFile);
@@ -90,26 +107,32 @@ public class DetectUnusedCodeAction extends AnAction {
     boolean isEnabled = false;
     String actionText = "Unused Code Detector";
 
-    if (psiDirectory != null && isJavaSourceDirectory(psiDirectory, project)) {
-      // Java source folder - full analysis
-      isEnabled = true;
-      actionText = "Analyze Directory: " + psiDirectory.getName() + " (Classes, Methods, Imports)";
-    }
-    else if (psiFile instanceof PsiJavaFile) {
-      // Java file - imports only
+    if (psiDirectory != null) {
+      VirtualFile dirFile = psiDirectory.getVirtualFile();
+      ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+      // Lightweight check: accept if it's a source root or a common source folder name
+      if (fileIndex.isInSourceContent(dirFile) ||
+              dirFile.getName().matches("java|src|main|test|generated")) {
+        isEnabled = true;
+        actionText = "Analyze Directory: " + psiDirectory.getName() + " (Classes, Methods, Imports)";
+      }
+    } else if (psiFile instanceof PsiJavaFile) {
       isEnabled = true;
       actionText = "Check Imports in: " + psiFile.getName();
-    }
-    else {
-      // Other selections - disabled
-      isEnabled = false;
-      actionText = "Unused Code Detector (Select Java Source Folder or Java File)";
     }
 
     e.getPresentation().setEnabled(isEnabled);
     e.getPresentation().setText(actionText);
   }
 
+  @Override
+  public @NotNull ActionUpdateThread getActionUpdateThread() {
+    // update() only performs lightweight checks, so it can run on a background thread
+    return ActionUpdateThread.BGT;
+  }
+
+  // -------------------------------------------------------------------------
+  // Lightweight directory check for update()
   private boolean isJavaSourceDirectory(PsiDirectory directory, Project project) {
     VirtualFile virtualFile = directory.getVirtualFile();
     return isJavaSourceDirectory(virtualFile, project);
@@ -117,77 +140,60 @@ public class DetectUnusedCodeAction extends AnAction {
 
   private boolean isJavaSourceDirectory(VirtualFile virtualFile, Project project) {
     ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
-
-    // Check if this is in source content
     if (fileIndex.isInSourceContent(virtualFile)) {
-      // Check if it contains Java files
-      return containsJavaFiles(virtualFile);
+      return true;
     }
-
-    // Check common source folder names
     String name = virtualFile.getName();
     return name.equals("java") || name.equals("src") || name.equals("main") ||
             name.equals("test") || name.equals("generated");
   }
 
-  private boolean containsJavaFiles(VirtualFile directory) {
-    if (!directory.isDirectory()) return false;
-
-    for (VirtualFile child : directory.getChildren()) {
-      if (child.isDirectory()) {
-        if (containsJavaFiles(child)) return true;
-      } else if (child.getName().endsWith(".java")) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private void analyzeDirectory(UnusedCodeAnalysisService service, PsiDirectory directory,
-                                UnusedCodeToolWindow toolWindow, Project project) {
+  // -------------------------------------------------------------------------
+  // Directory analysis (full scan)
+  private void analyzeDirectory(UnusedCodeAnalysisService service,
+                                PsiDirectory directory,
+                                UnusedCodeToolWindowPanel panel,
+                                Project project) {
     List<PsiJavaFile> javaFiles = new ArrayList<>();
     collectJavaFiles(directory, javaFiles);
 
     if (javaFiles.isEmpty()) {
-      toolWindow.setStatus("No Java files found in selected directory");
+      panel.setStatus("No Java files found in selected directory");
       return;
     }
 
-    toolWindow.setStatus(String.format("Analyzing %d Java files for classes, methods, and imports...", javaFiles.size()));
-
-    // Full analysis for directory (classes, methods, imports)
-    service.analyzeFiles(javaFiles, new AnalysisCallbackImpl(toolWindow, true));
-  }
-
-  private void analyzeFileImportsOnly(UnusedCodeAnalysisService service, PsiJavaFile javaFile,
-                                      UnusedCodeToolWindow toolWindow) {
-    toolWindow.setStatus(String.format("Analyzing imports in %s...", javaFile.getName()));
-
-    // Imports-only analysis for single file
-    service.analyzeFileImportsOnly(javaFile, new AnalysisCallbackImpl(toolWindow, false));
+    panel.setStatus(String.format("Analyzing %d Java files for classes, methods, and imports...", javaFiles.size()));
+    service.analyzeFiles(javaFiles, new AnalysisCallbackImpl(panel, true));
   }
 
   private void collectJavaFiles(PsiDirectory directory, List<PsiJavaFile> javaFiles) {
-    // Check files in this directory
     for (PsiFile file : directory.getFiles()) {
       if (file instanceof PsiJavaFile) {
         javaFiles.add((PsiJavaFile) file);
       }
     }
-
-    // Check subdirectories
     for (PsiDirectory subdir : directory.getSubdirectories()) {
       collectJavaFiles(subdir, javaFiles);
     }
   }
 
-  // Update AnalysisCallbackImpl in DetectUnusedCodeAction.java
+  // -------------------------------------------------------------------------
+  // Single file analysis (imports only)
+  private void analyzeFileImportsOnly(UnusedCodeAnalysisService service,
+                                      PsiJavaFile javaFile,
+                                      UnusedCodeToolWindowPanel panel) {
+    panel.setStatus(String.format("Analyzing imports in %s...", javaFile.getName()));
+    service.analyzeFileImportsOnly(javaFile, new AnalysisCallbackImpl(panel, false));
+  }
+
+  // -------------------------------------------------------------------------
+  // Callback that updates the UI panel
   private static class AnalysisCallbackImpl implements UnusedCodeAnalysisService.AnalysisCallback {
-    private final UnusedCodeToolWindow toolWindow;
+    private final UnusedCodeToolWindowPanel panel;
     private final boolean isFullAnalysis;
 
-    AnalysisCallbackImpl(UnusedCodeToolWindow toolWindow, boolean isFullAnalysis) {
-      this.toolWindow = toolWindow;
+    AnalysisCallbackImpl(UnusedCodeToolWindowPanel panel, boolean isFullAnalysis) {
+      this.panel = panel;
       this.isFullAnalysis = isFullAnalysis;
     }
 
@@ -197,29 +203,39 @@ public class DetectUnusedCodeAction extends AnAction {
                            List<UnusedImport> imports,
                            List<DuplicateImport> duplicates) {
       SwingUtilities.invokeLater(() -> {
-        toolWindow.setResults(classes, methods, imports, duplicates);
-
+        panel.setResults(classes, methods, imports, duplicates);
         if (isFullAnalysis) {
-          toolWindow.setStatus(String.format(
-                  "Analysis complete: %d classes, %d methods, %d unused imports, %d duplicate imports",
-                  classes.size(), methods.size(), imports.size(), duplicates.size()
-          ));
+          panel.setStatus(String.format("Analysis complete: %d classes, %d methods, %d unused imports, %d duplicate imports",
+                  classes.size(), methods.size(), imports.size(), duplicates.size()));
         } else {
-          toolWindow.setStatus(String.format(
-                  "Import analysis complete: %d unused imports, %d duplicate imports found",
-                  imports.size(), duplicates.size()
-          ));
+          panel.setStatus(String.format("Import analysis complete: %d unused imports, %d duplicate imports",
+                  imports.size(), duplicates.size()));
         }
-
-        toolWindow.show();
+        // Optionally send a notification
+        if (imports.size() + duplicates.size() > 0) {
+          Notification notification = new Notification(
+                  "Unused Code Detector",
+                  "Analysis Complete",
+                  String.format("Found %d unused imports and %d duplicate imports.", imports.size(), duplicates.size()),
+                  NotificationType.INFORMATION
+          );
+          Notifications.Bus.notify(notification, panel.getProject());
+        }
       });
     }
 
     @Override
     public void onError(String error) {
       SwingUtilities.invokeLater(() -> {
-        toolWindow.setStatus("Error: " + error);
-        toolWindow.show();
+        panel.setStatus("Error: " + error);
+        Notification notification = new Notification(
+                "Unused Code Detector",
+                "Analysis Error",
+                error,
+                NotificationType.ERROR
+        );
+        Notifications.Bus.notify(notification, panel.getProject());
       });
     }
-  }}
+  }
+}
