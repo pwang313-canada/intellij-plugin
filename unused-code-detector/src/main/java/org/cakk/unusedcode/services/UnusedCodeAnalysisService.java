@@ -44,6 +44,9 @@ public class UnusedCodeAnalysisService {
       @Override
       public void run(@NotNull ProgressIndicator indicator) {
         try {
+          // Clear caches to ensure fresh analysis
+          clearCaches();
+
           List<UnusedClass> allClasses = new ArrayList<>();
           List<UnusedMethod> allMethods = new ArrayList<>();
           List<UnusedImport> allImports = new ArrayList<>();
@@ -81,7 +84,7 @@ public class UnusedCodeAnalysisService {
                   callback.onError(e.getMessage())
           );
         } finally {
-          clearCaches();
+          clearCaches(); // optional, but safe
         }
       }
     }.queue();
@@ -92,6 +95,8 @@ public class UnusedCodeAnalysisService {
       @Override
       public void run(@NotNull ProgressIndicator indicator) {
         try {
+          clearCaches();
+
           List<UnusedClass> emptyClasses = new ArrayList<>();
           List<UnusedMethod> emptyMethods = new ArrayList<>();
           List<UnusedImport> unusedImports = new ArrayList<>();
@@ -126,44 +131,45 @@ public class UnusedCodeAnalysisService {
 
     if (indicator.isCanceled()) return;
 
-    // Analyze imports and duplicates
+    // Analyze imports and duplicates (these already use ReadAction internally)
     analyzeImportsOptimized(javaFile, fileImports, indicator);
     analyzeDuplicateImports(javaFile, fileDuplicates, indicator);
 
     if (indicator.isCanceled()) return;
 
-    // Analyze classes and methods
-    PsiClass[] classes = javaFile.getClasses();
-    for (PsiClass psiClass : classes) {
-      if (indicator.isCanceled()) return;
-
-      // Check class usage (now fully implemented)
-      if (!isClassUsed(psiClass)) {
-        fileClasses.add(new UnusedClass(
-                psiClass.getName(),
-                psiClass.getContainingClass() != null ?
-                        psiClass.getContainingClass().getQualifiedName() : "",
-                psiClass,
-                javaFile
-        ));
-      }
-
-      // Analyze methods
-      for (PsiMethod method : psiClass.getMethods()) {
+    // All PSI reads below must be under a read action
+    ReadAction.run(() -> {
+      PsiClass[] classes = javaFile.getClasses();
+      for (PsiClass psiClass : classes) {
         if (indicator.isCanceled()) return;
 
-        if (isMethodCheckable(method) && !isMethodUsed(method)) {
-          fileMethods.add(new UnusedMethod(
-                  method.getName(),
+        // Check class usage (already uses ReadAction internally)
+        if (!isClassUsed(psiClass)) {
+          fileClasses.add(new UnusedClass(
                   psiClass.getName(),
-                  method,
+                  psiClass.getContainingClass() != null ?
+                          psiClass.getContainingClass().getQualifiedName() : "",
+                  psiClass,
                   javaFile
           ));
         }
-      }
-    }
-  }
 
+        // Analyze methods
+        for (PsiMethod method : psiClass.getMethods()) {
+          if (indicator.isCanceled()) return;
+
+          if (isMethodCheckable(method) && !isMethodUsed(method)) {
+            fileMethods.add(new UnusedMethod(
+                    method.getName(),
+                    psiClass.getName(),
+                    method,
+                    javaFile
+            ));
+          }
+        }
+      }
+    });
+  }
   // ========== OPTIMIZED IMPORT ANALYSIS ==========
 
   private void analyzeImportsOptimized(PsiJavaFile javaFile,
@@ -263,20 +269,22 @@ public class UnusedCodeAnalysisService {
   // ========== IMPORT EXTRACTION ==========
 
   private List<ImportInfo> extractImportsFromText(PsiJavaFile javaFile) {
-    List<ImportInfo> imports = new ArrayList<>();
-    String text = javaFile.getText();
-    String[] lines = text.split("\n");
+    return ReadAction.compute(() -> {
+      List<ImportInfo> imports = new ArrayList<>();
+      String text = javaFile.getText();
+      String[] lines = text.split("\n");
 
-    for (int i = 0; i < lines.length; i++) {
-      String line = lines[i].trim();
-      if (line.startsWith("import ")) {
-        String importText = extractImportText(line);
-        if (importText != null && !importText.isEmpty()) {
-          imports.add(new ImportInfo(importText, i));
+      for (int i = 0; i < lines.length; i++) {
+        String line = lines[i].trim();
+        if (line.startsWith("import ")) {
+          String importText = extractImportText(line);
+          if (importText != null && !importText.isEmpty()) {
+            imports.add(new ImportInfo(importText, i));
+          }
         }
       }
-    }
-    return imports;
+      return imports;
+    });
   }
 
   private String extractImportText(String importLine) {
@@ -351,9 +359,17 @@ public class UnusedCodeAnalysisService {
   // ========== UNUSED CLASS DETECTION ==========
 
   private boolean isClassUsed(PsiClass psiClass) {
-    // Skip classes from the Java standard library
     String qName = psiClass.getQualifiedName();
-    if (qName != null && (qName.startsWith("java.") || qName.startsWith("javax.") || qName.startsWith("jdk."))) {
+    if (qName == null) return true;
+
+    // Skip Java standard library
+    if (qName.startsWith("java.") || qName.startsWith("javax.") || qName.startsWith("jdk.")) {
+      return true;
+    }
+
+    // Check whitelist
+    String simpleName = psiClass.getName();
+    if (simpleName != null && getWhitelist().isClassWhitelisted(simpleName)) {
       return true;
     }
 
@@ -363,25 +379,33 @@ public class UnusedCodeAnalysisService {
               Query<PsiReference> query = ReferencesSearch.search(cls, scope);
               for (PsiReference ref : query) {
                 PsiElement element = ref.getElement();
-                // Exclude references that are inside the class itself
                 if (element != null && !PsiTreeUtil.isAncestor(cls, element, true)) {
-                  return true; // found an external reference -> used
+                  return true; // external reference found
                 }
               }
-              return false; // no external references -> unused
+              return false; // no external reference → unused
             })
     );
   }
 
-  // ========== UNUSED METHOD DETECTION (PLACEHOLDER) ==========
+  // ========== UNUSED METHOD DETECTION ==========
 
   private boolean isMethodUsed(PsiMethod method) {
-    // TODO: Implement real method usage detection
-    // Currently, only private methods are considered checkable, and we always return true
+    String className = method.getContainingClass().getQualifiedName();
     String methodName = method.getName();
-    if (methodName.startsWith("get") || methodName.startsWith("set") || methodName.startsWith("is")) return true;
-    if (method.isConstructor()) return true;
-    return true; // no detection yet
+
+    // Whitelist check
+    if (className != null && getWhitelist().isMethodWhitelisted(className, methodName)) {
+      return true;
+    }
+
+    // For now, treat all non‑private methods as used; private methods as unused.
+    // Later we can implement proper reference search.
+    if (method.hasModifierProperty(PsiModifier.PUBLIC) ||
+            method.hasModifierProperty(PsiModifier.PROTECTED)) {
+      return true;
+    }
+    return false;
   }
 
   private boolean isMethodCheckable(PsiMethod method) {
@@ -399,6 +423,12 @@ public class UnusedCodeAnalysisService {
 
     // Only consider private methods (public/protected may be used externally)
     return method.hasModifierProperty(PsiModifier.PRIVATE);
+  }
+
+  // ========== WHITELIST HELPERS ==========
+
+  private WhitelistService getWhitelist() {
+    return WhitelistService.getInstance();
   }
 
   // ========== CACHE MANAGEMENT ==========

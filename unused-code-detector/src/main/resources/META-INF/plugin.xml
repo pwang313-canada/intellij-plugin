@@ -34,6 +34,7 @@
                     factoryClass="org.cakk.unusedcode.ui.UnusedCodeToolWindowFactory"
                     anchor="bottom"
                     icon="AllIcons.Toolwindows.ToolWindowStructure"/>
+        <applicationService serviceImplementation="org.cakk.unusedcode.services.WhitelistService"/>
         <notificationGroup id="Unused Code Detector" displayType="BALLOON"/>
     </extensions>
 

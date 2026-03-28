@@ -16,6 +16,7 @@ import org.cakk.unusedcode.models.DuplicateImport;
 import org.cakk.unusedcode.models.UnusedClass;
 import org.cakk.unusedcode.models.UnusedImport;
 import org.cakk.unusedcode.models.UnusedMethod;
+import org.cakk.unusedcode.services.WhitelistService;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -218,8 +219,10 @@ public class UnusedCodeToolWindowPanel {
   private void showPopupMenu(int x, int y) {
     TreePath selectedPath = resultTree.getPathForLocation(x, y);
     if (selectedPath == null) return;
-
     resultTree.setSelectionPath(selectedPath);
+
+    DefaultMutableTreeNode node = (DefaultMutableTreeNode) selectedPath.getLastPathComponent();
+    Object userObject = node.getUserObject();
 
     JPopupMenu popup = new JPopupMenu();
 
@@ -230,12 +233,20 @@ public class UnusedCodeToolWindowPanel {
     popup.addSeparator();
 
     JMenuItem removeItem = new JMenuItem("Remove", AllIcons.Actions.DeleteTag);
-    removeItem.addActionListener(e -> removeSelected());
+    removeItem.addActionListener(e -> removeSelected());  // shows confirmation
     popup.add(removeItem);
 
     JMenuItem copyItem = new JMenuItem("Copy to Clipboard", AllIcons.Actions.Copy);
     copyItem.addActionListener(e -> copyToClipboard());
     popup.add(copyItem);
+
+    // Add whitelist option for classes and methods
+    if (userObject instanceof UnusedClass || userObject instanceof UnusedMethod) {
+      popup.addSeparator();
+      JMenuItem whitelistItem = new JMenuItem("Add to Whitelist", AllIcons.Actions.AddFile);
+      whitelistItem.addActionListener(e -> addToWhitelist(userObject));
+      popup.add(whitelistItem);
+    }
 
     popup.show(resultTree, x, y);
   }
@@ -565,5 +576,47 @@ public class UnusedCodeToolWindowPanel {
     }
 
     statusLabel.setText(status.toString());
+  }
+
+  private WhitelistService getWhitelist() {
+    return WhitelistService.getInstance();
+  }
+
+  private void removeSelectedNode() {
+    TreePath selectedPath = resultTree.getSelectionPath();
+    if (selectedPath == null) return;
+    Object lastComponent = selectedPath.getLastPathComponent();
+    if (!(lastComponent instanceof DefaultMutableTreeNode)) return;
+
+    DefaultMutableTreeNode node = (DefaultMutableTreeNode) lastComponent;
+    DefaultMutableTreeNode parent = (DefaultMutableTreeNode) node.getParent();
+    if (parent != null) {
+      parent.remove(node);
+      // If the category becomes empty, remove it too
+      if (parent.getChildCount() == 0) {
+        DefaultMutableTreeNode grandParent = (DefaultMutableTreeNode) parent.getParent();
+        if (grandParent != null) {
+          grandParent.remove(parent);
+        }
+      }
+      ((DefaultTreeModel) resultTree.getModel()).reload();
+    }
+  }
+
+  private void addToWhitelist(Object userObject) {
+    if (userObject instanceof UnusedClass) {
+      UnusedClass unusedClass = (UnusedClass) userObject;
+      String simpleClassName = unusedClass.getClassName();  // simple name, not full
+      WhitelistService.getInstance().addClassToWhitelist(simpleClassName);
+      removeSelectedNode();
+      setStatus("Added " + simpleClassName + " to whitelist. Re-run analysis to see updated results.");
+    } else if (userObject instanceof UnusedMethod) {
+      UnusedMethod method = (UnusedMethod) userObject;
+      String className = method.getContainingClass();       // simple name of containing class
+      String methodName = method.getMethodName();
+      WhitelistService.getInstance().addMethodToWhitelist(className, methodName);
+      removeSelectedNode();
+      setStatus("Added " + className + "." + methodName + " to whitelist. Re-run analysis to see updated results.");
+    }
   }
 }
