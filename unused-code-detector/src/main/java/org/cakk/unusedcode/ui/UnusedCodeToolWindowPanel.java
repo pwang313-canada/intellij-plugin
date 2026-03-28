@@ -3,10 +3,8 @@ package org.cakk.unusedcode.ui;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.ScrollType;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -40,6 +38,10 @@ public class UnusedCodeToolWindowPanel {
   private JLabel statusLabel;
   private JButton refreshButton;
   private JButton clearButton;
+
+  public Project getProject() {
+    return project;
+  }
 
   public UnusedCodeToolWindowPanel(Project project) {
     this.project = project;

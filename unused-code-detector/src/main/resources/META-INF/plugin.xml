@@ -1,5 +1,5 @@
 <!-- src/main/resources/META-INF/plugin.xml -->
-<idea-plugin id="org.cakk.unused-code-detector">
+<idea-plugin>
     <name>Unused Code Detector</name>
     <version>1.0.0</version>
     <vendor email="support@cakk.org" url="https://cakk.org">CAKK</vendor>
@@ -34,6 +34,7 @@
                     factoryClass="org.cakk.unusedcode.ui.UnusedCodeToolWindowFactory"
                     anchor="bottom"
                     icon="AllIcons.Toolwindows.ToolWindowStructure"/>
+        <notificationGroup id="Unused Code Detector" displayType="BALLOON"/>
     </extensions>
 
     <actions>
