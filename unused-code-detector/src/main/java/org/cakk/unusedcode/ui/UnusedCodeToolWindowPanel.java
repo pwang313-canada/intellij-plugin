@@ -180,25 +180,35 @@ public class UnusedCodeToolWindowPanel {
       UnusedImport unusedImport = (UnusedImport) userObject;
       virtualFile = unusedImport.getContainingFile().getVirtualFile();
       lineNumber = unusedImport.getLineNumber();
-    } else if (userObject instanceof UnusedMethod) {
-      UnusedMethod method = (UnusedMethod) userObject;
-      virtualFile = method.getContainingFile().getVirtualFile();
+    } else if (userObject instanceof DuplicateImport) {
+      DuplicateImport duplicate = (DuplicateImport) userObject;
+      virtualFile = duplicate.getContainingFile().getVirtualFile();
+      if (!duplicate.getLineNumbers().isEmpty()) {
+        lineNumber = duplicate.getLineNumbers().get(0);
+      }
     } else if (userObject instanceof UnusedClass) {
       UnusedClass unusedClass = (UnusedClass) userObject;
       virtualFile = unusedClass.getContainingFile().getVirtualFile();
+      // lineNumber could be added to UnusedClass later if needed
+    } else if (userObject instanceof UnusedMethod) {
+      UnusedMethod method = (UnusedMethod) userObject;
+      virtualFile = method.getContainingFile().getVirtualFile();
+      // optionally get line number from method
     }
 
     if (virtualFile != null && virtualFile.isValid()) {
       FileEditorManager.getInstance(project).openFile(virtualFile, true);
-
       if (lineNumber >= 0) {
         final int finalLineNumber = lineNumber;
         ApplicationManager.getApplication().invokeLater(() -> {
           Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
-          if (editor != null) {
+          if (editor != null && finalLineNumber < editor.getDocument().getLineCount()) {
             int lineStartOffset = editor.getDocument().getLineStartOffset(finalLineNumber);
             editor.getCaretModel().moveToOffset(lineStartOffset);
             editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
+            // Optionally highlight the line
+            editor.getSelectionModel().setSelection(lineStartOffset,
+                    editor.getDocument().getLineEndOffset(finalLineNumber));
           }
         });
       }
