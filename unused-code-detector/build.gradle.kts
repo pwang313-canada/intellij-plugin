@@ -45,10 +45,9 @@ tasks {
             
             <h3>🚀 Usage</h3>
             <ol>
-                <li>Go to <code>Tools → Detect Unused Code</code></li>
-                <li>Select the scope (Whole project, Module, or Current file)</li>
+                <li>Go to project <code>src</code> folder, right click and chose analyze</li>
                 <li>Review results in the tool window</li>
-                <li>Right-click on any result to remove it</li>
+                <li>Double click to go to specific class, method or import package</li>
             </ol>
         """.trimIndent())
 
