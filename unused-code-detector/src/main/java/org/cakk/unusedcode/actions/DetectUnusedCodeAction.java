@@ -12,10 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.psi.*;
-import org.cakk.unusedcode.models.DuplicateImport;
-import org.cakk.unusedcode.models.UnusedClass;
-import org.cakk.unusedcode.models.UnusedImport;
-import org.cakk.unusedcode.models.UnusedMethod;
+import org.cakk.unusedcode.models.*;
 import org.cakk.unusedcode.services.UnusedCodeAnalysisService;
 import org.cakk.unusedcode.ui.UnusedCodeToolWindowFactory;
 import org.cakk.unusedcode.ui.UnusedCodeToolWindowPanel;
@@ -201,9 +198,10 @@ public class DetectUnusedCodeAction extends AnAction {
     public void onComplete(List<UnusedClass> classes,
                            List<UnusedMethod> methods,
                            List<UnusedImport> imports,
-                           List<DuplicateImport> duplicates) {
+                           List<DuplicateImport> duplicates,
+                           List<UnusedVariable> variables) {
       SwingUtilities.invokeLater(() -> {
-        panel.setResults(classes, methods, imports, duplicates);
+        panel.setResults(classes, methods, imports, duplicates, variables);
         if (isFullAnalysis) {
           panel.setStatus(String.format("Analysis complete: %d classes, %d methods, %d unused imports, %d duplicate imports",
                   classes.size(), methods.size(), imports.size(), duplicates.size()));

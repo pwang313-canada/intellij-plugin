@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>org.cakk.unused-code-detector</id>
     <name>Unused Code Detector</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="pwang313@gmail.com" url="https://cakk.org">Cakk TechSoft Inc.</vendor>
 
     <description><![CDATA[
@@ -18,7 +18,7 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>Version 1.0.0</h3>
+        <h3>Version 1.0.1</h3>
         <ul>
             <li>Initial release</li>
             <li>Unused import detection</li>
