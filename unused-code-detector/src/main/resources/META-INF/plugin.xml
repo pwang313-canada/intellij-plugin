@@ -1,5 +1,6 @@
 <!-- src/main/resources/META-INF/plugin.xml -->
 <idea-plugin>
+    <id>org.cakk.unused-code-detector</id>
     <name>Unused Code Detector</name>
     <version>1.0.0</version>
     <vendor email="pwang313@gmail.com" url="https://cakk.org">Cakk TechSoft Inc.</vendor>

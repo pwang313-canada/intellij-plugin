@@ -606,17 +606,22 @@ public class UnusedCodeToolWindowPanel {
   private void addToWhitelist(Object userObject) {
     if (userObject instanceof UnusedClass) {
       UnusedClass unusedClass = (UnusedClass) userObject;
-      String simpleClassName = unusedClass.getClassName();  // simple name, not full
-      WhitelistService.getInstance().addClassToWhitelist(simpleClassName);
+      String className = unusedClass.getFullName();          // fully qualified
+      WhitelistService.getInstance().addClassToWhitelist(className);
       removeSelectedNode();
-      setStatus("Added " + simpleClassName + " to whitelist. Re-run analysis to see updated results.");
+      setStatus("Added " + className + " to whitelist. Re-run analysis to see updated results.");
     } else if (userObject instanceof UnusedMethod) {
       UnusedMethod method = (UnusedMethod) userObject;
-      String className = method.getContainingClass();       // simple name of containing class
+      // Get the fully qualified class name from the PSI method
+      String fullClassName = method.getPsiMethod().getContainingClass().getQualifiedName();
+      if (fullClassName == null) {
+        // Class in default package – fallback to simple name
+        fullClassName = method.getContainingClass();
+      }
       String methodName = method.getMethodName();
-      WhitelistService.getInstance().addMethodToWhitelist(className, methodName);
+      WhitelistService.getInstance().addMethodToWhitelist(fullClassName, methodName);
       removeSelectedNode();
-      setStatus("Added " + className + "." + methodName + " to whitelist. Re-run analysis to see updated results.");
+      setStatus("Added " + fullClassName + "." + methodName + " to whitelist. Re-run analysis to see updated results.");
     }
   }
 }
