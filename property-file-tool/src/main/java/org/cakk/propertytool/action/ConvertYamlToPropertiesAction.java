@@ -1,4 +1,4 @@
-package org.cakk.memoryleak.action;
+package org.cakk.propertytool.action;
 
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;

@@ -2,7 +2,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.17.3"
 }
 
-group = "org.cakk.property"
+group = "org.cakk.property-file-tool"
 version = "1.0.0"
 
 repositories {
@@ -18,5 +18,16 @@ dependencies {
 
 intellij {
     version.set("2023.3")
-    type.set("IC")
+    type.set("IC") // IntelliJ IDEA Community Edition
+    plugins.set(listOf("com.intellij.java"))
+}
+
+tasks {
+    patchPluginXml {
+        sinceBuild.set("233")
+        untilBuild.set("253.*")
+
+        version.set(project.version.toString())
+
+    }
 }
