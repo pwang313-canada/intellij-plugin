@@ -6,6 +6,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+@Service(Service.Level.PROJECT)
 @State(
         name = "MemoryLeakSettings",
         storages = @Storage("memoryLeakDetector.xml")

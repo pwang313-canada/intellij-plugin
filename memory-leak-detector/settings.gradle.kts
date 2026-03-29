@@ -1,2 +1,2 @@
-rootProject.name = "MemoryLeakDetector"
+rootProject.name = "memory-leak-detector"
 

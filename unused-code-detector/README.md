@@ -1,41 +1,38 @@
-# Memory Leak Detector
+# Unused Code Detector
 
-An IntelliJ IDEA plugin to help detecting memory leak.
+An IntelliJ IDEA plugin to help detecting unused code.
 
-## How to Confirm a Java Memory Leak
+## What's called unused code
 
-- **Rapid Old Gen Growth**: 
-    - The used heap and Old Generation (Old Gen) grow rapidly over time.
+- **Unused/duplicated import package**: 
+    - No harm to remove these import package.
 
-- **Ineffective Garbage Collection**:
-    - After triggering GC, the Heap Used and Old Gen do not decrease significantly..
+- **Unused class/method**:
+    - User can create a whitelist for those public class/method even they are not referenced, 
 
 
 ## How to Use
 ### 1, Install the plugin.
 clone the repo
 
-`https://github.com/pwang313-canada/intellij-plugin.git`
+```bash
+https://github.com/pwang313-canada/intellij-plugin.git
+```
+
 
 Navigate to the plugin directory:
 
-`memory-leak-detector`
+`intellij-plugin`
 
 Build the plugin:
 
-`./gradlew clean buildPlugin`
+```bash
+./gradlew :unused-code-detector:buildPlugin
+```
 
-After MemoryLeakDetector.jar is generated, install it as a local plugin in IntelliJ IDEA.
+After unused-code-detector.zip is generated under distributions, install it as a local plugin in IntelliJ IDEA.
 
-### 2. Start Java application as follow
-
-Add some VM parameters to command line, either from
-
-`java -Dcom.sun.management.jmxremote      \
-    -Dcom.sun.management.jmxremote.port=9020      \
-    -Dcom.sun.management.jmxremote.authenticate=false      \
-    -Dcom.sun.management.jmxremote.ssl=false \
-    StaticReference`
+### 2. Start Java application
 
 Or configure them in IntelliJ:
 

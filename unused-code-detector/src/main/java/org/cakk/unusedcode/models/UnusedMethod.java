@@ -10,12 +10,15 @@ public class UnusedMethod {
   private final PsiMethod psiMethod;
   private final PsiFile containingFile;
   private final String filePath;
+  private final int lineNumber;          // new
 
-  public UnusedMethod(String methodName, String containingClass, PsiMethod psiMethod, PsiFile containingFile) {
+  public UnusedMethod(String methodName, String containingClass, PsiMethod psiMethod,
+                      PsiFile containingFile, int lineNumber) {
     this.methodName = methodName;
     this.containingClass = containingClass;
     this.psiMethod = psiMethod;
     this.containingFile = containingFile;
+    this.lineNumber = lineNumber;
     this.filePath = containingFile.getVirtualFile() != null ?
             containingFile.getVirtualFile().getPath() : "";
   }
@@ -25,7 +28,7 @@ public class UnusedMethod {
   public PsiMethod getPsiMethod() { return psiMethod; }
   public PsiFile getContainingFile() { return containingFile; }
   public String getFilePath() { return filePath; }
-
+  public int getLineNumber() { return lineNumber; }
   public String getFullName() {
     return containingClass + "." + methodName + "()";
   }

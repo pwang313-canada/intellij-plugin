@@ -1,13 +1,19 @@
 plugins {
-    id("java")
     id("org.jetbrains.intellij") version "1.17.3"
 }
 
-group = "org.cakk"
+group = "org.cakk.unused-code-detector"
 version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    implementation("org.yaml:snakeyaml:2.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+    testImplementation("org.mockito:mockito-core:5.7.0")
 }
 
 intellij {
@@ -31,9 +37,10 @@ tasks {
                 <li>Detects unused classes in the project</li>
                 <li>Identifies unused methods (including private methods)</li>
                 <li>Finds unused imports in Java files</li>
-                <li>Finds dtplicate imports in Java files</li>
+                <li>Finds duplicate imports in Java files</li>
                 <li>Provides quick fixes to remove unused code</li>
                 <li>Shows results in a dedicated tool window</li>
+                <li>export unused code list</li>
             </ul>
             
             <h3>🚀 Usage</h3>
@@ -56,11 +63,5 @@ tasks {
                 <li>🧹 Quick fixes to remove unused code</li>
             </ul>
         """.trimIndent())
-    }
-
-    compileJava {
-        options.encoding = "UTF-8"
-        sourceCompatibility = "17"
-        targetCompatibility = "17"
     }
 }
