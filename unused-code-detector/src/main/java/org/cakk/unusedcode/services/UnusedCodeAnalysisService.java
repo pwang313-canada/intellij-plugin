@@ -11,13 +11,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.LocalSearchScope;
+import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.Query;
-import org.cakk.unusedcode.models.DuplicateImport;
-import org.cakk.unusedcode.models.UnusedClass;
-import org.cakk.unusedcode.models.UnusedImport;
-import org.cakk.unusedcode.models.UnusedMethod;
+import org.cakk.unusedcode.models.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -35,6 +34,7 @@ public class UnusedCodeAnalysisService {
   private final Map<PsiJavaFile, Set<String>> usedClassNamesCache = new ConcurrentHashMap<>();
   private final Map<PsiClass, Boolean> classUsageCache = new ConcurrentHashMap<>();
   private final Map<PsiMethod, Boolean> methodUsageCache = new ConcurrentHashMap<>();
+  private final Map<PsiVariable, Boolean> variableUsageCache = new ConcurrentHashMap<>();
 
   public UnusedCodeAnalysisService(Project project) {
     this.project = project;
@@ -54,6 +54,7 @@ public class UnusedCodeAnalysisService {
           List<UnusedMethod> allMethods = new ArrayList<>();
           List<UnusedImport> allImports = new ArrayList<>();
           List<DuplicateImport> allDuplicates = new ArrayList<>();
+          List<UnusedVariable> allVariables = new ArrayList<>();   // ← NEW
 
           int total = javaFiles.size();
           int processed = 0;
@@ -69,17 +70,19 @@ public class UnusedCodeAnalysisService {
             List<UnusedMethod> fileMethods = new ArrayList<>();
             List<UnusedImport> fileImports = new ArrayList<>();
             List<DuplicateImport> fileDuplicates = new ArrayList<>();
+            List<UnusedVariable> fileVariables = new ArrayList<>();  // ← NEW
 
-            analyzeSingleFile(javaFile, fileClasses, fileMethods, fileImports, fileDuplicates, indicator);
+            analyzeSingleFile(javaFile, fileClasses, fileMethods, fileImports, fileDuplicates, fileVariables, indicator);
 
             allClasses.addAll(fileClasses);
             allMethods.addAll(fileMethods);
             allImports.addAll(fileImports);
             allDuplicates.addAll(fileDuplicates);
+            allVariables.addAll(fileVariables);  // ← NEW
           }
 
           ApplicationManager.getApplication().invokeLater(() ->
-                  callback.onComplete(allClasses, allMethods, allImports, allDuplicates)
+                  callback.onComplete(allClasses, allMethods, allImports, allDuplicates, allVariables)
           );
 
         } catch (Exception e) {
@@ -104,12 +107,13 @@ public class UnusedCodeAnalysisService {
           List<UnusedMethod> emptyMethods = new ArrayList<>();
           List<UnusedImport> unusedImports = new ArrayList<>();
           List<DuplicateImport> duplicateImports = new ArrayList<>();
+          List<UnusedVariable> unusedVariable = new ArrayList<>();
 
           analyzeImportsOptimized(javaFile, unusedImports, indicator);
           analyzeDuplicateImports(javaFile, duplicateImports, indicator);
 
           ApplicationManager.getApplication().invokeLater(() ->
-                  callback.onComplete(emptyClasses, emptyMethods, unusedImports, duplicateImports)
+                  callback.onComplete(emptyClasses, emptyMethods, unusedImports, duplicateImports, unusedVariable)
           );
 
         } catch (Exception e) {
@@ -130,6 +134,7 @@ public class UnusedCodeAnalysisService {
                                  List<UnusedMethod> fileMethods,
                                  List<UnusedImport> fileImports,
                                  List<DuplicateImport> fileDuplicates,
+                                 List<UnusedVariable> fileVariables,        // ← NEW
                                  ProgressIndicator indicator) {
 
     if (indicator.isCanceled()) return;
@@ -172,11 +177,164 @@ public class UnusedCodeAnalysisService {
             ));
           }
         }
+        analyzeVariablesInClass(psiClass, fileVariables, javaFile, indicator);
       }
     });
   }
   // ========== OPTIMIZED IMPORT ANALYSIS ==========
 
+  private void analyzeVariablesInClass(PsiClass psiClass,
+                                       List<UnusedVariable> fileVariables,
+                                       PsiJavaFile javaFile,
+                                       ProgressIndicator indicator) {
+
+    if (psiClass.getName() != null &&
+            (psiClass.getName().endsWith("Test") ||
+                    psiClass.getName().endsWith("Tests") ||
+                    psiClass.hasAnnotation("org.junit.jupiter.api.Test") ||
+                    psiClass.getQualifiedName() != null && psiClass.getQualifiedName().contains(".generated."))) {
+      return; // skip entire class
+    }
+    // 1. Fields
+    for (PsiField field : psiClass.getFields()) {
+      if (indicator.isCanceled()) return;
+      if (isVariableCheckable(field) && !isVariableUsed(field)) {
+        int line = getLineNumber(field);
+        fileVariables.add(new UnusedVariable(
+                field.getName(),
+                psiClass.getName(),
+                field,
+                javaFile,
+                line
+        ));
+      }
+    }
+
+    // 2. Local variables + parameters in all methods
+    for (PsiMethod method : psiClass.getMethods()) {
+      if (indicator.isCanceled()) return;
+
+      Collection<PsiVariable> locals = PsiTreeUtil.findChildrenOfType(method, PsiLocalVariable.class);
+      for (PsiVariable local : locals) {
+        if (indicator.isCanceled()) return;
+        if (isVariableCheckable(local) && !isVariableUsed(local)) {
+          int line = getLineNumber(local);
+          fileVariables.add(new UnusedVariable(
+                  local.getName(),
+                  psiClass.getName(),
+                  local,
+                  javaFile,
+                  line
+          ));
+        }
+      }
+
+      // Parameters (optional - you can remove if you don't want them)
+      for (PsiParameter param : method.getParameterList().getParameters()) {
+        if (indicator.isCanceled()) return;
+        if (isVariableCheckable(param) && !isVariableUsed(param)) {
+          int line = getLineNumber(param);
+          fileVariables.add(new UnusedVariable(
+                  param.getName(),
+                  psiClass.getName(),
+                  param,
+                  javaFile,
+                  line
+          ));
+        }
+      }
+    }
+  }
+
+  private boolean isVariableUsed(PsiVariable variable) {
+    return variableUsageCache.computeIfAbsent(variable, v -> ReadAction.compute(() -> {
+      boolean isPrivate = variable.hasModifierProperty(PsiModifier.PRIVATE);
+
+      SearchScope scope = isPrivate
+              ? createLocalClassScope(variable)
+              : GlobalSearchScope.projectScope(project);
+
+      Query<PsiReference> query = ReferencesSearch.search(variable, scope);
+
+      for (PsiReference ref : query) {
+        PsiElement element = ref.getElement();
+        if (element != null && !PsiTreeUtil.isAncestor(variable, element, true)) {
+          return true; // used somewhere else
+        }
+      }
+      return false; // unused
+    }));
+  }
+
+  private SearchScope createLocalClassScope(PsiVariable variable) {
+    PsiClass containingClass = PsiTreeUtil.getParentOfType(variable, PsiClass.class);
+    return containingClass != null
+            ? new LocalSearchScope(containingClass)
+            : new LocalSearchScope(variable.getContainingFile());
+  }
+
+  private boolean isVariableCheckable(PsiVariable variable) {
+    String name = variable.getName();
+    if (name == null) return false;
+
+    // Skip common ignored names
+    if (name.startsWith("_") ||
+            name.equals("log") ||
+            name.equals("LOGGER") ||
+            name.equals("serialVersionUID")) {
+      return false;
+    }
+
+    // Skip variables in enhanced for loops, try-with-resources, etc.
+    if (PsiTreeUtil.getParentOfType(variable,
+            PsiForeachStatement.class,
+            PsiResourceList.class,
+            PsiResourceVariable.class) != null) {
+      return false;
+    }
+
+    // Skip parameters in methods annotated with @Override
+    if (variable instanceof PsiParameter param) {
+      PsiMethod method = PsiTreeUtil.getParentOfType(param, PsiMethod.class);
+      if (method != null && isOverriddenMethod(method)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Helper method
+  private boolean isOverriddenMethod(PsiMethod method) {
+    PsiModifierList modifierList = method.getModifierList();
+    if (modifierList == null) return false;
+
+    return modifierList.findAnnotation("java.lang.Override") != null ||
+            modifierList.findAnnotation("Override") != null;
+  }
+
+  // ========== UPDATE CACHE CLEAR ==========
+
+  public void clearCaches() {
+    codeBodyCache.clear();
+    codeStartCache.clear();
+    usedClassNamesCache.clear();
+    classUsageCache.clear();
+    methodUsageCache.clear();
+    variableUsageCache.clear();        // ← NEW
+  }
+
+  // ========== UPDATE CALLBACK INTERFACE ==========
+
+  public interface AnalysisCallback {
+    void onComplete(List<UnusedClass> classes,
+                    List<UnusedMethod> methods,
+                    List<UnusedImport> imports,
+                    List<DuplicateImport> duplicates,
+                    List<UnusedVariable> variables);   // ← NEW
+
+    void onError(String error);
+  }
   private void analyzeImportsOptimized(PsiJavaFile javaFile,
                                        List<UnusedImport> fileImports,
                                        ProgressIndicator indicator) {
@@ -442,16 +600,6 @@ public class UnusedCodeAnalysisService {
     return WhitelistService.getInstance();
   }
 
-  // ========== CACHE MANAGEMENT ==========
-
-  public void clearCaches() {
-    codeBodyCache.clear();
-    codeStartCache.clear();
-    usedClassNamesCache.clear();
-    classUsageCache.clear();
-    methodUsageCache.clear();
-  }
-
   // ========== INNER CLASSES ==========
 
   private static class ImportInfo {
@@ -462,14 +610,6 @@ public class UnusedCodeAnalysisService {
       this.importText = importText;
       this.lineNumber = lineNumber;
     }
-  }
-
-  public interface AnalysisCallback {
-    void onComplete(List<UnusedClass> classes,
-                    List<UnusedMethod> methods,
-                    List<UnusedImport> imports,
-                    List<DuplicateImport> duplicates);
-    void onError(String error);
   }
 
   private int getLineNumber(PsiElement element) {

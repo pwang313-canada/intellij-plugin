@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "org.cakk.unused-code-detector"
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -45,21 +45,16 @@ tasks {
             
             <h3>🚀 Usage</h3>
             <ol>
-                <li>Go to project <code>src</code> folder, right click and chose analyze</li>
-                <li>Review results in the tool window</li>
+                <li>Go to project <code>src</code> folder, right click and chose Analyze on top</li>
+                <li>Click the plugin icon from bottom, review results in the tool window</li>
                 <li>Double click to go to specific class, method or import package</li>
             </ol>
         """.trimIndent())
 
         changeNotes.set("""
-            <h3>Version 1.0.0</h3>
+            <h3>Version 1.0.1</h3>
             <ul>
-                <li>🎉 Initial release</li>
-                <li>🔍 Unused class detection</li>
-                <li>📝 Unused method detection</li>
-                <li>📝 Duplicate import detection</li>
-                <li>📦 Unused import detection</li>
-                <li>🧹 Quick fixes to remove unused code</li>
+                <li>🎉 add unused variable feature</li>
             </ul>
         """.trimIndent())
     }

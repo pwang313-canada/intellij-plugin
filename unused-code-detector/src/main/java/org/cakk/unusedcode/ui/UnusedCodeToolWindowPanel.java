@@ -12,10 +12,7 @@ import com.intellij.psi.PsiImportStatement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
-import org.cakk.unusedcode.models.DuplicateImport;
-import org.cakk.unusedcode.models.UnusedClass;
-import org.cakk.unusedcode.models.UnusedImport;
-import org.cakk.unusedcode.models.UnusedMethod;
+import org.cakk.unusedcode.models.*;
 import org.cakk.unusedcode.services.WhitelistService;
 
 import javax.swing.*;
@@ -37,8 +34,6 @@ public class UnusedCodeToolWindowPanel {
   private Tree resultTree;
   private DefaultMutableTreeNode rootNode;
   private JLabel statusLabel;
-  private JButton refreshButton;
-  private JButton clearButton;
 
   public Project getProject() {
     return project;
@@ -56,11 +51,11 @@ public class UnusedCodeToolWindowPanel {
     JToolBar toolBar = new JToolBar();
     toolBar.setFloatable(false);
 
-    refreshButton = new JButton("Refresh", AllIcons.Actions.Refresh);
+    JButton refreshButton = new JButton("Refresh", AllIcons.Actions.Refresh);
     refreshButton.addActionListener(e -> refreshAnalysis());
     toolBar.add(refreshButton);
 
-    clearButton = new JButton("Clear", AllIcons.Actions.GC);
+    JButton clearButton = new JButton("Clear", AllIcons.Actions.GC);
     clearButton.addActionListener(e -> clearResults());
     toolBar.add(clearButton);
 
@@ -165,51 +160,42 @@ public class UnusedCodeToolWindowPanel {
   }
 
   private void navigateToSelected() {
-    TreePath selectedPath = resultTree.getSelectionPath();
-    if (selectedPath == null) return;
+    TreePath path = resultTree.getSelectionPath();
+    if (path == null) return;
 
-    Object lastComponent = selectedPath.getLastPathComponent();
-    if (!(lastComponent instanceof DefaultMutableTreeNode)) return;
-
-    DefaultMutableTreeNode node = (DefaultMutableTreeNode) lastComponent;
-    Object userObject = node.getUserObject();
+    Object userObject = ((DefaultMutableTreeNode) path.getLastPathComponent()).getUserObject();
 
     VirtualFile virtualFile = null;
     int lineNumber = -1;
 
-    if (userObject instanceof UnusedImport) {
-      UnusedImport unusedImport = (UnusedImport) userObject;
-      virtualFile = unusedImport.getContainingFile().getVirtualFile();
-      lineNumber = unusedImport.getLineNumber();
-    } else if (userObject instanceof DuplicateImport) {
-      DuplicateImport duplicate = (DuplicateImport) userObject;
-      virtualFile = duplicate.getContainingFile().getVirtualFile();
-      if (!duplicate.getLineNumbers().isEmpty()) {
-        lineNumber = duplicate.getLineNumbers().get(0);
-      }
-    } else if (userObject instanceof UnusedClass) {
-      UnusedClass unusedClass = (UnusedClass) userObject;
-      virtualFile = unusedClass.getContainingFile().getVirtualFile();
-      // lineNumber could be added to UnusedClass later if needed
-    } else if (userObject instanceof UnusedMethod) {
-      UnusedMethod method = (UnusedMethod) userObject;
-      virtualFile = method.getContainingFile().getVirtualFile();
-      lineNumber = method.getLineNumber();
+    if (userObject instanceof UnusedImport ui) {
+      virtualFile = ui.getContainingFile().getVirtualFile();
+      lineNumber = ui.getLineNumber();
+    } else if (userObject instanceof DuplicateImport di) {
+      virtualFile = di.getContainingFile().getVirtualFile();
+      if (!di.getLineNumbers().isEmpty()) lineNumber = di.getLineNumbers().get(0);
+    } else if (userObject instanceof UnusedClass uc) {
+      virtualFile = uc.getContainingFile().getVirtualFile();
+    } else if (userObject instanceof UnusedMethod um) {
+      virtualFile = um.getContainingFile().getVirtualFile();
+      lineNumber = um.getLineNumber();
+    } else if (userObject instanceof UnusedVariable uv) {        // ← Added
+      virtualFile = uv.getContainingFile().getVirtualFile();
+      lineNumber = uv.getLineNumber();
     }
 
-    if (virtualFile != null && virtualFile.isValid()) {
+    if (virtualFile != null) {
       FileEditorManager.getInstance(project).openFile(virtualFile, true);
+
       if (lineNumber >= 0) {
-        final int finalLineNumber = lineNumber;
+        final int ln = lineNumber;
         ApplicationManager.getApplication().invokeLater(() -> {
           Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
-          if (editor != null && finalLineNumber < editor.getDocument().getLineCount()) {
-            int lineStartOffset = editor.getDocument().getLineStartOffset(finalLineNumber);
-            editor.getCaretModel().moveToOffset(lineStartOffset);
+          if (editor != null) {
+            int offset = editor.getDocument().getLineStartOffset(ln);
+            editor.getCaretModel().moveToOffset(offset);
             editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
-            // Optionally highlight the line
-            editor.getSelectionModel().setSelection(lineStartOffset,
-                    editor.getDocument().getLineEndOffset(finalLineNumber));
+            editor.getSelectionModel().setSelection(offset, editor.getDocument().getLineEndOffset(ln));
           }
         });
       }
@@ -306,22 +292,17 @@ public class UnusedCodeToolWindowPanel {
   }
 
   private String getItemDescription(Object userObject) {
-    if (userObject instanceof UnusedImport) {
-      UnusedImport imp = (UnusedImport) userObject;
-      return String.format("Import: %s\nFile: %s\nLine: %d",
-              imp.getImportText(),
-              imp.getFilePath(),
-              imp.getLineNumber() + 1);
-    } else if (userObject instanceof UnusedMethod) {
-      UnusedMethod method = (UnusedMethod) userObject;
-      return String.format("Method: %s\nFile: %s",
-              method.getFullName(),
-              method.getFilePath());
-    } else if (userObject instanceof UnusedClass) {
-      UnusedClass cls = (UnusedClass) userObject;
-      return String.format("Class: %s\nFile: %s",
-              cls.getFullName(),
-              cls.getFilePath());
+    if (userObject instanceof UnusedVariable uv) {
+      return String.format("Variable: %s\nClass: %s\nFile: %s\nLine: %d",
+              uv.getName(), uv.getClassName(), uv.getFilePath(), uv.getLineNumber() + 1);
+    }
+    // Keep your existing code for other types
+    if (userObject instanceof UnusedImport imp) {
+      return String.format("Import: %s\nFile: %s\nLine: %d", imp.getImportText(), imp.getFilePath(), imp.getLineNumber() + 1);
+    } else if (userObject instanceof UnusedMethod method) {
+      return String.format("Method: %s\nFile: %s", method.getFullName(), method.getFilePath());
+    } else if (userObject instanceof UnusedClass cls) {
+      return String.format("Class: %s\nFile: %s", cls.getFullName(), cls.getFilePath());
     }
     return "Unknown item";
   }
@@ -461,7 +442,8 @@ public class UnusedCodeToolWindowPanel {
   public void setResults(List<UnusedClass> classes,
                          List<UnusedMethod> methods,
                          List<UnusedImport> imports,
-                         List<DuplicateImport> duplicates) {
+                         List<DuplicateImport> duplicates,
+                         List<UnusedVariable> variables) {
     SwingUtilities.invokeLater(() -> {
       System.out.println("=== UnusedCodeToolWindowPanel.setResults ===");
       System.out.println("Classes: " + classes.size());
@@ -520,6 +502,14 @@ public class UnusedCodeToolWindowPanel {
           methodNode.add(new DefaultMutableTreeNode(method));
         }
         rootNode.add(methodNode);
+      }
+
+      if (!variables.isEmpty()) {
+        DefaultMutableTreeNode varNode = new DefaultMutableTreeNode("🔸 Unused Variables (" + variables.size() + ")");
+        for (UnusedVariable v : variables) {
+          varNode.add(new DefaultMutableTreeNode(v));
+        }
+        rootNode.add(varNode);
       }
 
       // Show message if nothing found
