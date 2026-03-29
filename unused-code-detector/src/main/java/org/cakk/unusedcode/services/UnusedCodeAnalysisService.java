@@ -23,6 +23,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.intellij.debugger.impl.DebuggerUtilsEx.getLineNumber;
+
 public class UnusedCodeAnalysisService {
 
   private final Project project;
@@ -32,6 +34,7 @@ public class UnusedCodeAnalysisService {
   private final Map<PsiJavaFile, Integer> codeStartCache = new ConcurrentHashMap<>();
   private final Map<PsiJavaFile, Set<String>> usedClassNamesCache = new ConcurrentHashMap<>();
   private final Map<PsiClass, Boolean> classUsageCache = new ConcurrentHashMap<>();
+  private final Map<PsiMethod, Boolean> methodUsageCache = new ConcurrentHashMap<>();
 
   public UnusedCodeAnalysisService(Project project) {
     this.project = project;
@@ -159,11 +162,13 @@ public class UnusedCodeAnalysisService {
           if (indicator.isCanceled()) return;
 
           if (isMethodCheckable(method) && !isMethodUsed(method)) {
+            int lineNumber = getLineNumber(method);
             fileMethods.add(new UnusedMethod(
                     method.getName(),
                     psiClass.getName(),
                     method,
-                    javaFile
+                    javaFile,
+                    lineNumber
             ));
           }
         }
@@ -394,18 +399,24 @@ public class UnusedCodeAnalysisService {
     String className = method.getContainingClass().getQualifiedName();
     String methodName = method.getName();
 
-    // Whitelist check
+    // Whitelist check (uses simple class name, as per your requirement)
     if (className != null && getWhitelist().isMethodWhitelisted(className, methodName)) {
       return true;
     }
 
-    // For now, treat all non‑private methods as used; private methods as unused.
-    // Later we can implement proper reference search.
-    if (method.hasModifierProperty(PsiModifier.PUBLIC) ||
-            method.hasModifierProperty(PsiModifier.PROTECTED)) {
-      return true;
-    }
-    return false;
+    // Cached reference search
+    return methodUsageCache.computeIfAbsent(method, m -> ReadAction.compute(() -> {
+      GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+      Query<PsiReference> query = ReferencesSearch.search(m, scope);
+      for (PsiReference ref : query) {
+        PsiElement element = ref.getElement();
+        // If the reference is not inside the method itself, it's a usage
+        if (element != null && !PsiTreeUtil.isAncestor(m, element, true)) {
+          return true;
+        }
+      }
+      return false;
+    }));
   }
 
   private boolean isMethodCheckable(PsiMethod method) {
@@ -438,6 +449,7 @@ public class UnusedCodeAnalysisService {
     codeStartCache.clear();
     usedClassNamesCache.clear();
     classUsageCache.clear();
+    methodUsageCache.clear();
   }
 
   // ========== INNER CLASSES ==========
@@ -458,5 +470,15 @@ public class UnusedCodeAnalysisService {
                     List<UnusedImport> imports,
                     List<DuplicateImport> duplicates);
     void onError(String error);
+  }
+
+  private int getLineNumber(PsiElement element) {
+    return ReadAction.compute(() -> {
+      VirtualFile vf = element.getContainingFile().getVirtualFile();
+      if (vf == null) return -1;
+      Document doc = FileDocumentManager.getInstance().getDocument(vf);
+      if (doc == null) return -1;
+      return doc.getLineNumber(element.getTextRange().getStartOffset());
+    });
   }
 }

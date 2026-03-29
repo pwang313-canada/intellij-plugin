@@ -2,7 +2,7 @@
 <idea-plugin>
     <name>Unused Code Detector</name>
     <version>1.0.0</version>
-    <vendor email="support@cakk.org" url="https://cakk.org">CAKK</vendor>
+    <vendor email="pwang313@gmail.com" url="https://cakk.org">Cakk TechSoft Inc.</vendor>
 
     <description><![CDATA[
         <h2>Unused Code Detector</h2>
@@ -45,7 +45,6 @@
                 description="Detect unused classes, methods, duplicate imports, and unused imports">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

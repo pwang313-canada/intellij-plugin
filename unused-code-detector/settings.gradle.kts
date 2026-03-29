@@ -1,2 +1,2 @@
-rootProject.name = "UnusedCodeDetector"
+rootProject.name = "unused-code-detector"
 

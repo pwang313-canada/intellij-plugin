@@ -8,6 +8,7 @@ import org.cakk.unusedcode.models.DuplicateImport;
 import org.cakk.unusedcode.models.UnusedClass;
 import org.cakk.unusedcode.models.UnusedImport;
 import org.cakk.unusedcode.models.UnusedMethod;
+import org.cakk.unusedcode.models.UnusedMethod;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;

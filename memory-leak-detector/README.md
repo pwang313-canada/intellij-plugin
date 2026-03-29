@@ -19,23 +19,33 @@ clone the repo
 
 Navigate to the plugin directory:
 
-`memory-leak-detector`
+```adlanguage
+intellij-plug
+```
+
 
 Build the plugin:
 
-`./gradlew clean buildPlugin`
 
-After MemoryLeakDetector.jar is generated, install it as a local plugin in IntelliJ IDEA.
+```adlanguage
+./gradlew :memory-leak-detector:buildPlugin
+```
 
-### 2. Start Java application as follow
+
+After memory-leak-detector.zip is generated under distributions, install it as a local plugin in IntelliJ IDEA.
+
+### 2. Start Java application as follows
 
 Add some VM parameters to command line, either from
 
-`java -Dcom.sun.management.jmxremote      \
+```adlanguage
+java -Dcom.sun.management.jmxremote      \
     -Dcom.sun.management.jmxremote.port=9020      \
     -Dcom.sun.management.jmxremote.authenticate=false      \
     -Dcom.sun.management.jmxremote.ssl=false \
-    StaticReference`
+    StaticReference
+```
+
 
 Or configure them in IntelliJ:
 

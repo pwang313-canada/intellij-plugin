@@ -1,2 +1,2 @@
-rootProject.name = "PropertyTool"
+rootProject.name = "property"
 

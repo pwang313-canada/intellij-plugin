@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>org.cakk.memory-leak-detector</id>
     <name>Memory Leak Detector</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="pwang313@gmail.com" url="https://cakk.org">Cakk TechSoft Inc.</vendor>
 
     <description><![CDATA[
@@ -36,12 +36,16 @@
             <li><b>Leak Simulation</b> - Built-in simulation to test detection</li>
             <li><b>Configurable Thresholds</b> - Customize detection sensitivity</li>
             <li><b>Detailed Logging</b> - Complete history of GC events and alerts</li>
-            <li><b>File/Line Detection</b> - Pinpoints exact source code locations of memory leaks</li>
+            <li>
+              📂 <a href="https://github.com/pwang313-canada/CommonJavaIssueDetect/tree/main/MemoryLeakExample/src">
+              GitHub Example Project (With/Without Memory Leak Demo)
+              </a>
+            </li>
         </ul>
 
         <h3>How to Use:</h3>
         <ol>
-            <li>Open <b>View → Tool Windows → Memory Monitor</b></li>
+            <li>Click </li>
             <li>Click <b>Start Monitoring</b> to begin tracking memory usage</li>
             <li>Watch the chart and statistics for unusual growth patterns</li>
             <li>When rapid growth is detected, the exact file and line will be shown</li>
@@ -61,20 +65,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>Version 1.0.0 (Initial Release)</h3>
+        <h3>Version 1.0.1 </h3>
         <ul>
-            <li>Initial release of Memory Leak Detector</li>
-            <li>Real-time heap and old generation monitoring</li>
-            <li>Automatic leak detection with multiple severity levels</li>
-            <li>Interactive GC confirmation dialog</li>
-            <li>Memory chart with zoom capability</li>
-            <li>GC event tracking and efficiency analysis</li>
-            <li>Leak simulation for testing</li>
-            <li>Configurable detection thresholds</li>
-            <li>Tool window with statistics panel and log viewer</li>
-            <li>Keyboard shortcuts (Ctrl+Alt+M to start monitoring)</li>
-            <li><b>NEW:</b> File and line number leak detection</li>
-            <li><b>NEW:</b> Allocation tracking and survivor analysis</li>
+            <li>Remove menu from Tools</li>
+            <li>Screenshot fix</li>
+            <li>Add Icon for this plugin </li>
         </ul>
 
         <h3>Known Issues</h3>
@@ -89,6 +84,7 @@
             <li>Export memory data to CSV</li>
             <li>Email notifications for critical alerts</li>
             <li>Integration with IntelliJ Profiler</li>
+            <li>Found the leak class and method</li>
         </ul>
     ]]></change-notes>
 
@@ -106,10 +102,7 @@
                     canCloseContents="false"/>
 
         <!-- Services - Register all services here -->
-        <projectService serviceImplementation="org.cakk.memoryleak.services.MemoryMonitorService"/>
-        <projectService serviceImplementation="org.cakk.memoryleak.services.LeakDetectionService"/>
         <projectService serviceImplementation="org.cakk.memoryleak.services.AllocationInterceptor"/>
-        <projectService serviceImplementation="org.cakk.memoryleak.settings.MemoryLeakSettings"/>
 
         <!-- Settings Page -->
         <projectConfigurable instance="org.cakk.memoryleak.ui.MemoryLeakSettingsConfigurable"
@@ -130,18 +123,7 @@
                 text="Start Memory Monitoring"
                 description="Start monitoring memory usage for leaks"
                 icon="AllIcons.Actions.Execute">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt M"/>
-        </action>
-
-        <!-- Stop Monitoring Action -->
-        <action id="MemoryLeakDetector.StopMonitoring"
-                class="org.cakk.memoryleak.actions.StopDetectionAction"
-                text="Stop Memory Monitoring"
-                description="Stop memory monitoring"
-                icon="AllIcons.Actions.Suspend">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
         </action>
 
         <!-- Simulate Leak Action -->
@@ -150,7 +132,6 @@
                 text="Simulate Memory Leak"
                 description="Run a memory leak simulation to test detection"
                 icon="AllIcons.General.Warning">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
 
@@ -160,60 +141,15 @@
                 text="Find Memory Leaks"
                 description="Analyze current memory usage and find potential leaks"
                 icon="AllIcons.Actions.Find">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt L"/>
         </action>
 
-        <!-- Force GC Action -->
-        <action id="MemoryLeakDetector.ForceGC"
-                class="org.cakk.memoryleak.actions.ForceGCAction"
-                text="Force Garbage Collection"
-                description="Request JVM to run garbage collection"
-                icon="AllIcons.Actions.GC">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-        </action>
-
-        <!-- Toggle Monitoring Action -->
-        <action id="MemoryLeakDetector.ToggleMonitoring"
-                class="org.cakk.memoryleak.actions.ToggleMonitoringAction"
-                text="Toggle Memory Monitoring"
-                description="Start or stop memory monitoring">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift M"/>
-        </action>
-
-        <!-- Remote Monitoring Actions -->
-        <action id="MemoryLeakDetector.ConnectRemote"
-                class="org.cakk.memoryleak.actions.ConnectToRemoteAction"
-                text="Connect to Remote Process"
-                description="Connect to a running Java application to monitor its memory"
-                icon="AllIcons.General.Web">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt R"/>
-        </action>
-        <!-- Disconnect Action -->
-        <action id="MemoryLeakDetector.Disconnect"
-                class="org.cakk.memoryleak.actions.DisconnectAction"
-                text="Disconnect"
-                description="Disconnect from remote process"
-                icon="AllIcons.Actions.Cancel">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
-        </action>
-
-        <action id="MemoryLeakDetector.CheckLeaks"
-                class="org.cakk.memoryleak.actions.CheckMemoryLeaksAction"
-                text="Check Memory Leaks"
-                description="Check for memory leaks with GC analysis"
-                icon="AllIcons.Actions.Check">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
-        </action>
         <action id="MemoryLeakDetector.AnalyzeAfterGC"
                 class="org.cakk.memoryleak.actions.AnalyzeAfterGCAction"
                 text="Analyze Memory After GC"
                 description="Analyze memory leaks when GC doesn't reduce heap size"
                 icon="AllIcons.Actions.Analyze">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
         </action>
@@ -222,25 +158,8 @@
                 text="Detailed GC Analysis"
                 description="Detailed analysis of GC effectiveness and memory leak detection"
                 icon="AllIcons.Actions.Analyze">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt D"/>
-        </action>
-
-        <action id="MemoryLeakDetector.DisconnectRemote"
-                class="org.cakk.memoryleak.actions.DisconnectFromRemoteAction"
-                text="Disconnect from Remote"
-                description="Disconnect from remote process"
-                icon="AllIcons.Actions.Cancel">
-            <add-to-group group-id="ToolsMenu" anchor="first"/>
-        </action>
-
-        <action id="MemoryLeakDetector.AnalyzeRemoteLeak"
-                class="org.cakk.memoryleak.actions.AnalyzeAfterGCAction"
-                text="Analyze Remote Memory Leak"
-                description="Analyze memory leak in remote process"
-                icon="AllIcons.Actions.Analyze">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
 
         <action id="MemoryLeakDetector.LocalLeakTest"
@@ -248,7 +167,6 @@
                 text="Test Local Memory Leak"
                 description="Test memory leak detection with exact file and line tracking"
                 icon="AllIcons.General.Warning">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>

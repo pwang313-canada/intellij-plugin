@@ -194,7 +194,7 @@ public class UnusedCodeToolWindowPanel {
     } else if (userObject instanceof UnusedMethod) {
       UnusedMethod method = (UnusedMethod) userObject;
       virtualFile = method.getContainingFile().getVirtualFile();
-      // optionally get line number from method
+      lineNumber = method.getLineNumber();
     }
 
     if (virtualFile != null && virtualFile.isValid()) {
