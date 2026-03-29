@@ -65,13 +65,6 @@ tasks {
                 <li>When rapid old gen growth is detected, you'll receive a prompt with options to investigate or invoke GC</li>
             </ul>
         </li>
-        <li><strong>Manual Actions</strong>
-            <ul>
-                <li>Click <code>Force GC</code> to manually trigger garbage collection (with confirmation)</li>
-                <li>Use <code>Clear Data</code> to reset the chart and start fresh</li>
-                <li>Stop monitoring anytime via <code>Tools → Stop Monitoring</code></li>
-            </ul>
-        </li>
         <li><strong>Analyze Results</strong>
             <ul>
                 <li>Review GC efficiency metrics in the statistics panel</li>
