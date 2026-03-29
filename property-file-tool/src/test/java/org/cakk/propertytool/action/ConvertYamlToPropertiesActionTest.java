@@ -1,7 +1,7 @@
-package org.cakk.memoryleak.action;
+package org.cakk.propertytool.action;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import org.cakk.memoryleak.property.ConvertYamlToPropertiesAction;
+import org.cakk.propertytool.property.ConvertYamlToPropertiesAction;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

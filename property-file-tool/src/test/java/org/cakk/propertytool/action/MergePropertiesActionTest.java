@@ -1,7 +1,7 @@
-package org.cakk.memoryleak.action;
+package org.cakk.propertytool.action;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import org.cakk.memoryleak.property.MergePropertiesAction;
+import org.cakk.propertytool.property.MergePropertiesAction;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

@@ -1,3 +1,3 @@
 rootProject.name = "intellij-plugin"
 
-include("memory-leak-detector", "property", "unused-code-detector")
+include("memory-leak-detector", "property-file-tool", "unused-code-detector")

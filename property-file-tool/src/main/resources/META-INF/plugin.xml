@@ -1,7 +1,7 @@
 <idea-plugin>
 
     <id>org.cakk.propertytool</id>
-    <name>Property Tool</name>
+    <name>Property File Operator</name>
     <vendor email="pwang313@gmail.com">Example</vendor>
 
     <actions>
@@ -14,16 +14,16 @@
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
 
             <action id="PropertyTool.ConvertYaml"
-                    class="org.cakk.memoryleak.action.ConvertYamlToPropertiesAction"
+                    class="org.cakk.propertytool.action.ConvertYamlToPropertiesAction"
                     text="Convert YAML → Properties"
                     description="Convert YAML to Properties file"/>
             <action id="PropertyTool.ConvertProperties"
-                    class="org.cakk.memoryleak.action.ConvertPropertiesToYamlAction"
+                    class="org.cakk.propertytool.action.ConvertPropertiesToYamlAction"
                     text="Convert Properties → YAML"
                     description="Convert Properties to YAML file"/>
             <separator/>
-            <action id="org.cakk.memoryleak.action.MergePropertiesAction"
-                    class="org.cakk.memoryleak.action.MergePropertiesAction"
+            <action id="org.cakk.propertytool.action.MergePropertiesAction"
+                    class="org.cakk.propertytool.action.MergePropertiesAction"
                     text="Merge and Clean Properties Files"
                     description="Merge all properties files and move common properties to application.properties"/>
         </group>
