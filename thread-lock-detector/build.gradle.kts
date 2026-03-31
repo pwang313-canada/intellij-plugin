@@ -26,16 +26,38 @@ intellij {
 
 tasks {
     patchPluginXml {
-        sinceBuild.set("233")   // must match IDE major version
-        untilBuild.set("253.*")
+        sinceBuild.set("233")
+        untilBuild.set("263.*")          // maximum 2026.x (263.*)
 
         version.set(project.version.toString())
+        pluginDescription.set("""
+            <h2>Thread Lock Detector for Java</h2>
+            <p>This plugin helps you identify potential thread safety issues in Java code by detecting common anti-patterns related to synchronization and locking.</p>
+            
+            <h3>Detected Issues</h3>
+            <ul>
+                <li><strong>Synchronized methods</strong> – may hold locks longer than necessary, potentially reducing concurrency.</li>
+                <li><strong>Synchronizing on 'this'</strong> – discouraged because it exposes the lock to external code.</li>
+                <li><strong>Synchronizing on String literals</strong> – can cause global contention across unrelated parts of the application.</li>
+                <li><strong>Synchronizing on Class objects</strong> – often not recommended and may lead to unintended lock scope.</li>
+            </ul>
+            
+            <h3>How to Use</h3>
+            <ul>
+                <li>Right‑click a Java file or source folder in the project view, then select <strong>Analyze → Analyze Thread Lock</strong>.</li>
+                <li>Alternatively, from the edit window, open the java file, right click, go to <strong>Analyze → Analyze Thread Lock</strong> while a Java file is open or selected.</li>
+                <li>Results are displayed in the <strong>Thread Lock Checker</strong> tool window.</li>
+            </ul>
+            
+            <p>The analysis runs in the background and shows detailed warnings with line numbers and suggested fixes.</p>
+            
+            <p>Supported IntelliJ versions: 2023.3 and later.</p>
+        """.trimIndent())
 
         changeNotes.set("""
             <h3>Version 1.0.0</h3>
             <ul>
-                <li>🎉 Add thread lock analysis feature</li>
-                <li>✅ Unused variable detection</li>
+                <li>🎉 Initial release</li>
             </ul>
         """.trimIndent())
     }

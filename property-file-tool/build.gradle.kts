@@ -25,7 +25,7 @@ intellij {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("253.*")
+        untilBuild.set("263.*")          // maximum 2026.x (263.*)
 
         version.set(project.version.toString())
 

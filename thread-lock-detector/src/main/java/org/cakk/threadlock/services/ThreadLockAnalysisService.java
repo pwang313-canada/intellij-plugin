@@ -9,6 +9,7 @@ import org.cakk.threadlock.models.ThreadLockIssue;
 import org.cakk.threadlock.ui.ThreadLockToolWindowPanel;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +24,7 @@ public class ThreadLockAnalysisService {
   public void analyzeDirectory(PsiDirectory directory, ThreadLockToolWindowPanel panel) {
     List<PsiJavaFile> javaFiles = collectJavaFiles(directory);
     if (javaFiles.isEmpty()) {
-      panel.setStatus("No Java files found in the directory.");
+      SwingUtilities.invokeLater(() -> panel.setStatus("No Java files found in the directory."));
       return;
     }
 
@@ -43,7 +44,7 @@ public class ThreadLockAnalysisService {
           issues.addAll(analyzeSingleFile(file));
         }
 
-        panel.updateResults(issues);
+        SwingUtilities.invokeLater(() -> panel.updateResults(issues));
       }
     }.queue();
   }
@@ -53,7 +54,7 @@ public class ThreadLockAnalysisService {
       @Override
       public void run(@NotNull ProgressIndicator indicator) {
         List<ThreadLockIssue> issues = analyzeSingleFile(javaFile);
-        panel.updateResults(issues);
+        SwingUtilities.invokeLater(() -> panel.updateResults(issues));
       }
     }.queue();
   }

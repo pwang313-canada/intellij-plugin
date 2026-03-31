@@ -1,22 +1,32 @@
-<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect x="4" y="8" width="48" height="36" rx="6" fill="#2B2D42"></rect>
-
-  <!-- Code lines -->
-  <rect x="10" y="16" width="28" height="3" rx="1.5" fill="#8D99AE"></rect>
-  <rect x="10" y="22" width="24" height="3" rx="1.5" fill="#8D99AE"></rect>
-  <rect x="10" y="28" width="20" height="3" rx="1.5" fill="#8D99AE"></rect>
-
-  <!-- Unused line (highlighted) -->
-  <rect x="10" y="34" width="26" height="3" rx="1.5" fill="#EF233C"></rect>
-
-  <!-- Magnifying glass -->
-  <circle cx="40" cy="36" r="10" fill="#EDF2F4" stroke="#1D3557" stroke-width="3"></circle>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 512 512" height="512" width="512">
   
-  <!-- X mark -->
-  <line x1="36" y1="32" x2="44" y2="40" stroke="#EF233C" stroke-width="3" stroke-linecap="round"></line>
-  <line x1="44" y1="32" x2="36" y2="40" stroke="#EF233C" stroke-width="3" stroke-linecap="round"></line>
+  <rect fill="#1E1F26" rx="80" height="512" width="512"></rect>
 
-  <!-- Handle -->
-  <line x1="46" y1="42" x2="54" y2="50" stroke="#1D3557" stroke-width="4" stroke-linecap="round"></line>
+  
+  <rect stroke-width="26" stroke="#2C2F3A" fill="#A0A8B8" rx="38" height="218" width="236" y="198" x="138"></rect>
+  
+  
+  <path stroke-linecap="round" stroke-width="46" stroke="#DDE0E8" fill="none" d="M200 198 Q200 118 256 118 Q312 118 312 198"></path>
+
+  
+  <circle fill="#1E1F26" r="34" cy="295" cx="256"></circle>
+  <circle fill="#DDE0E8" r="19" cy="295" cx="256"></circle>
+  <rect fill="#1E1F26" rx="7" height="48" width="14" y="295" x="249"></rect>
+
+  
+  <path opacity="0.95" stroke-linecap="round" stroke-width="24" stroke="#FF4D4D" fill="none" d="M172 265 Q225 205 285 255 Q355 305 375 245"></path>
+  <path opacity="0.85" stroke-linecap="round" stroke-width="19" stroke="#FF8C00" fill="none" d="M165 315 Q235 375 305 285 Q375 235 390 305"></path>
+
+  
+  <g transform="translate(295 340)">
+    
+    <circle stroke-linecap="round" stroke-width="18" stroke="#FFEB3B" fill="none" r="48" cy="58" cx="58"></circle>
+    
+    <line stroke-linecap="round" stroke-width="18" stroke="#FFEB3B" y2="118" x2="118" y1="88" x1="88"></line>
+    
+    <circle opacity="0.6" stroke-width="12" stroke="#1E1F26" fill="none" r="32" cy="58" cx="58"></circle>
+  </g>
+
+  
+  <rect opacity="0.18" fill="#FFFFFF" rx="8" height="28" width="48" y="225" x="160"></rect>
 </svg>
