@@ -1,0 +1,43 @@
+<!-- src/main/resources/META-INF/plugin.xml -->
+<idea-plugin>
+    <id>com.cakk.threadlockchecker</id>
+    <name>Thread Lock Checker</name>
+    <version>1.0</version>
+    <vendor email="your@email.com">Cakk</vendor>
+
+    <!-- Tool window registration -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+                id="Thread Lock Checker"
+                anchor="bottom"
+                factoryClass="org.cakk.threadlock.ui.ThreadLockToolWindowFactory"
+                canCloseContents="true"/>
+    </extensions>
+
+    <!-- Actions -->
+    <actions>
+        <!-- Create a group that contains a separator and your action -->
+        <group id="ThreadLockGroup">
+            <separator/>
+            <action id="AnalyzeThreadLocksAction"
+                    class="org.cakk.threadlock.actions.AnalyzeThreadLocksAction"
+                    text="Analyze Thread Lock"
+                    description="Check thread lock issues in the selected file or folder"/>
+            <!-- Add this group to the Analyze menu -->
+            <add-to-group group-id="AnalyzeMenu" anchor="last"/>
+        </group>
+    </actions>
+
+    <!-- Optional: Java inspection for thread locks -->
+    <extensions defaultExtensionNs="com.intellij">
+        <localInspection
+                language="JAVA"
+                groupPath="Java|Threading"
+                groupName="Thread Locks"
+                shortName="DangerousLockUsage"
+                displayName="Dangerous thread lock / synchronization usage"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.cakk.threadlock.actions.DangerousLockInspection"/>
+    </extensions>
+</idea-plugin>
