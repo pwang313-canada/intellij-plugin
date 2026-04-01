@@ -1,13 +1,15 @@
-package org.cakk.propertytool.action;
+package org.cakk.propertytool.actions;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import org.cakk.propertytool.property.ConvertPropertiesToYamlAction;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.*;
 
 class ConvertPropertiesToYamlActionTest {
@@ -23,7 +25,7 @@ class ConvertPropertiesToYamlActionTest {
 
     invokeInsert(map, "server.port", "8080");
 
-    assertEquals("8080", ((Map<?, ?>) map.get("server")).get("port"));
+    Assertions.assertEquals("8080", ((Map<?, ?>) map.get("server")).get("port"));
   }
 
   @Test
@@ -35,7 +37,7 @@ class ConvertPropertiesToYamlActionTest {
     Map<?, ?> spring = (Map<?, ?>) map.get("spring");
     Map<?, ?> datasource = (Map<?, ?>) spring.get("datasource");
 
-    assertEquals("jdbc:mysql", datasource.get("url"));
+    Assertions.assertEquals("jdbc:mysql", datasource.get("url"));
   }
 
   @Test
@@ -48,8 +50,8 @@ class ConvertPropertiesToYamlActionTest {
     List<?> servers = (List<?>) map.get("servers");
     Map<?, ?> first = (Map<?, ?>) servers.get(0);
 
-    assertEquals("localhost", first.get("host"));
-    assertEquals("8080", first.get("port"));
+    Assertions.assertEquals("localhost", first.get("host"));
+    Assertions.assertEquals("8080", first.get("port"));
   }
 
   @Test
@@ -61,8 +63,8 @@ class ConvertPropertiesToYamlActionTest {
 
     List<?> servers = (List<?>) map.get("servers");
 
-    assertEquals("a", ((Map<?, ?>) servers.get(0)).get("host"));
-    assertEquals("b", ((Map<?, ?>) servers.get(1)).get("host"));
+    Assertions.assertEquals("a", ((Map<?, ?>) servers.get(0)).get("host"));
+    Assertions.assertEquals("b", ((Map<?, ?>) servers.get(1)).get("host"));
   }
 
   // ========================
@@ -75,9 +77,9 @@ class ConvertPropertiesToYamlActionTest {
 
     String yaml = action.generateYaml(map);
 
-    assertTrue(yaml.contains("server"));
-    assertTrue(yaml.contains("port"));
-    assertTrue(yaml.contains("8080"));
+    Assertions.assertTrue(yaml.contains("server"));
+    Assertions.assertTrue(yaml.contains("port"));
+    Assertions.assertTrue(yaml.contains("8080"));
   }
 
   // ========================
@@ -96,10 +98,10 @@ class ConvertPropertiesToYamlActionTest {
     Map<String, Object> result = action.loadProperties(file);
 
     Map<?, ?> server = (Map<?, ?>) result.get("server");
-    assertEquals("8080", server.get("port"));
+    Assertions.assertEquals("8080", server.get("port"));
 
     Map<?, ?> spring = (Map<?, ?>) result.get("spring");
-    assertEquals("test", spring.get("name"));
+    Assertions.assertEquals("test", spring.get("name"));
   }
 
   // ========================
@@ -115,8 +117,8 @@ class ConvertPropertiesToYamlActionTest {
 
     List<VirtualFile> result = action.collectPropertiesFiles(new VirtualFile[]{dir});
 
-    assertEquals(1, result.size());
-    assertEquals("a.properties", result.get(0).getName());
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals("a.properties", result.get(0).getName());
   }
 
   // ========================

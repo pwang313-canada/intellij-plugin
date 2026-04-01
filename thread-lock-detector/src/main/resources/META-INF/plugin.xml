@@ -1,34 +1,50 @@
 <!-- src/main/resources/META-INF/plugin.xml -->
 <idea-plugin>
     <id>com.cakk.threadlockchecker</id>
-    <name>Thread Lock Checker</name>
+    <name>Thread Lock Detector</name>
     <version>1.0</version>
     <vendor email="your@email.com">Cakk</vendor>
 
-    <!-- Tool window registration -->
-    <extensions defaultExtensionNs="com.intellij">
-        <toolWindow
-                id="Thread Lock Checker"
-                anchor="bottom"
-                factoryClass="org.cakk.threadlock.ui.ThreadLockToolWindowFactory"
-                canCloseContents="true"/>
-    </extensions>
+
 
     <!-- Actions -->
     <actions>
         <!-- Create a group that contains a separator and your action -->
-        <group id="ThreadLockGroup">
+        <group id="ThreadLockStaticGroup">
             <separator/>
-            <action id="AnalyzeThreadLocksAction"
-                    class="org.cakk.threadlock.actions.AnalyzeThreadLocksAction"
-                    text="Analyze Thread Lock"
-                    description="Check thread lock issues in the selected file or folder"/>
+            <action id="AnalyzeStaticThreadLocksAction"
+                    class="org.cakk.threadlock.actions.AnalyzeStaticThreadLocksAction"
+                    text="Analyze Static Thread Lock"
+                    description="Check static thread lock issues in the selected file or folder"/>
             <!-- Add this group to the Analyze menu -->
             <add-to-group group-id="AnalyzeMenu" anchor="last"/>
+        </group>
+        <group id="ThreadLockRuntimeGroup">
+            <separator/>
+            <action id="AnalyzeRuntimeThreadLocksAction"
+                    class="org.cakk.threadlock.actions.AnalyzeRuntimeThreadLocksAction"
+                    text="Analyze Runtime Thread Lock"
+                    description="Check runtime thread lock issues in the selected file or folder"/>
+            <!-- Add this group to the Analyze menu -->
+            <!--
+            <add-to-group group-id="AnalyzeMenu" anchor="last"/>
+            -->
         </group>
     </actions>
 
     <!-- Optional: Java inspection for thread locks -->
+    <!-- Tool window registration -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+                id="Thread Lock Detector"
+                anchor="bottom"
+                factoryClass="org.cakk.threadlock.ui.ThreadLockToolWindowFactory"
+                canCloseContents="true"/>
+
+        <projectService serviceImplementation="org.cakk.threadlock.services.RemoteDeadlockMonitorService"/>
+        <notificationGroup id="Deadlock Detector" displayType="BALLOON" isLogByDefault="true"/>
+    </extensions>
+    <!--
     <extensions defaultExtensionNs="com.intellij">
         <localInspection
                 language="JAVA"
@@ -39,5 +55,11 @@
                 enabledByDefault="true"
                 level="WARNING"
                 implementationClass="org.cakk.threadlock.actions.DangerousLockInspection"/>
+    </extensions>
+    -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- ... existing extensions ... -->
+        <projectService serviceImplementation="org.cakk.threadlock.services.RemoteDeadlockMonitorService"/>
+        <notificationGroup id="Deadlock Detector" displayType="BALLOON" isLogByDefault="true"/>
     </extensions>
 </idea-plugin>

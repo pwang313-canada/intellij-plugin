@@ -17,7 +17,7 @@ dependencies {
 }
 
 intellij {
-    version.set("2023.3")
+    version.set("2024.3")
     type.set("IC") // IntelliJ IDEA Community Edition
     plugins.set(listOf("com.intellij.java"))
 }
@@ -25,7 +25,7 @@ intellij {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("253.*")
+        untilBuild.set("263.*")
 
         version.set(project.version.toString())
         pluginDescription.set("""
@@ -49,6 +49,8 @@ tasks {
                 <li>Click the plugin icon from bottom, review results in the tool window</li>
                 <li>Double click to go to specific class, method or import package</li>
             </ol>
+            <p>Supported IntelliJ versions: 2023.3 and later.</p>
+
         """.trimIndent())
 
         changeNotes.set("""

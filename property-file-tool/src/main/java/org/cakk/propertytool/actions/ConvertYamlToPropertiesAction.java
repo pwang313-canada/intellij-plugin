@@ -1,4 +1,4 @@
-package org.cakk.propertytool.action;
+package org.cakk.propertytool.actions;
 
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;

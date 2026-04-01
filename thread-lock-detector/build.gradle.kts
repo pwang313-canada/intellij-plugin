@@ -1,7 +1,5 @@
 plugins {
     id("org.jetbrains.intellij") version "1.17.3"
-    // Optional: add Kotlin if your plugin uses Kotlin
-    // kotlin("jvm") version "1.9.10"
 }
 
 group = "org.cakk.threadlock-detector"
@@ -19,7 +17,7 @@ dependencies {
 }
 
 intellij {
-    version.set("2023.3")        // match the IDE you run
+    version.set("2024.3")        // match the IDE you run
     type.set("IC")               // IntelliJ Community Edition
     plugins.set(listOf("java"))  // only Java plugin dependency
 }
@@ -31,27 +29,45 @@ tasks {
 
         version.set(project.version.toString())
         pluginDescription.set("""
-            <h2>Thread Lock Detector for Java</h2>
-            <p>This plugin helps you identify potential thread safety issues in Java code by detecting common anti-patterns related to synchronization and locking.</p>
-            
-            <h3>Detected Issues</h3>
+    <h2>Thread Lock Checker</h2>
+    <p>Detects thread safety issues in Java code – both at compile time and during runtime execution.</p>
+
+    <h3>Features</h3>
+    <ul>
+        <li><strong>Static analysis</strong> – scans Java files for common anti‑patterns:
             <ul>
                 <li><strong>Synchronized methods</strong> – may hold locks longer than necessary, potentially reducing concurrency.</li>
                 <li><strong>Synchronizing on 'this'</strong> – discouraged because it exposes the lock to external code.</li>
                 <li><strong>Synchronizing on String literals</strong> – can cause global contention across unrelated parts of the application.</li>
                 <li><strong>Synchronizing on Class objects</strong> – often not recommended and may lead to unintended lock scope.</li>
             </ul>
-            
-            <h3>How to Use</h3>
+            Right‑click any Java file or source folder, then choose <strong>Analyze → Analyze Static Thread Lock</strong>. Results are shown in the <strong>Thread Lock Checker</strong> tool window.
+        </li>
+        <li><strong>Runtime deadlock monitor</strong> – attaches to a running Java process and detects actual deadlocks.
             <ul>
-                <li>Right‑click a Java file or source folder in the project view, then select <strong>Analyze → Analyze Thread Lock</strong>.</li>
-                <li>Alternatively, from the edit window, open the java file, right click, go to <strong>Analyze → Analyze Thread Lock</strong> while a Java file is open or selected.</li>
-                <li>Results are displayed in the <strong>Thread Lock Checker</strong> tool window.</li>
+                <li>Open the tool window (bottom left) and click <strong>Refresh</strong> to list all running Java applications.</li>
+                <li>Select a process from the dropdown and click <strong>Connect</strong>.</li>
+                <li>Once connected, click <strong>Start Monitoring</strong>. Any deadlock is instantly reported with full stack traces.</li>
             </ul>
-            
-            <p>The analysis runs in the background and shows detailed warnings with line numbers and suggested fixes.</p>
-            
-            <p>Supported IntelliJ versions: 2023.3 and later.</p>
+        </li>
+    </ul>
+
+    <h3>User Interface</h3>
+    <ul>
+        <li>The tool window is divided into two resizable sections:
+            <ul>
+                <li><strong>Top</strong> – static analysis results in a table (double‑click any row to navigate to the source line).</li>
+                <li><strong>Bottom</strong> – runtime monitor with collapsible connection controls, a clear log button, and a scrollable deadlock log.</li>
+            </ul>
+        </li>
+        <li>Static issues are highlighted with severity icons: <span style="color:red">🔴</span> for errors, <span style="color:orange">🟠</span> for warnings, and <span style="color:blue">ℹ️</span> for information.</li>
+        <li>Runtime monitor includes a <strong>Clear Log</strong> button to reset the deadlock display.</li>
+    </ul>
+
+    <h3>Requirements</h3>
+    <p>IntelliJ IDEA 2023.3 or later (Community or Ultimate). Java 11+.</p>
+
+    <p><strong>Note</strong>: The runtime monitor requires that the target Java process runs under the same user account as IntelliJ.</p>
         """.trimIndent())
 
         changeNotes.set("""

@@ -14,7 +14,7 @@ dependencies {
 }
 
 intellij {
-    version.set("2023.3")
+    version.set("2024.3")
     type.set("IC") // IntelliJ IDEA Community Edition
     plugins.set(listOf("com.intellij.java"))
 }
@@ -22,7 +22,7 @@ intellij {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("253.*")
+        untilBuild.set("263.*")
 
         version.set(project.version.toString())
         pluginDescription.set("""
@@ -79,6 +79,7 @@ tasks {
         <li>Remote monitoring requires JMX to be enabled on the target application with <code>-Dcom.sun.management.jmxremote</code></li>
         <li>The detector works best when monitoring applications for at least 30 seconds to establish baseline patterns</li>
     </ul>
+    <p>Supported IntelliJ versions: 2023.3 and later.</p>
 """.trimIndent())
 
         changeNotes.set("""

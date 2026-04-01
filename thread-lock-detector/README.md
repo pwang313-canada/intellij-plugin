@@ -1,82 +1,89 @@
 # Thread Lock Detector
 
-An IntelliJ IDEA plugin to help detecting unused code.
+Detects thread safety issues in Java code – both at compile time and during runtime execution.
 
-## What's called unused code
+## Features
 
-- **Unused/duplicated import package**: 
-    - No harm to remove these import package.
+### Static analysis
+Scans Java files for common anti‑patterns:
 
-- **Unused class/method**:
-    - User can create a whitelist for those public class/method even they are not referenced, 
+- **Synchronized methods** – may hold locks longer than necessary, potentially reducing concurrency.
+- **Synchronizing on `this`** – discouraged because it exposes the lock to external code.
+- **Synchronizing on String literals** – can cause global contention across unrelated parts of the application.
+- **Synchronizing on Class objects** – often not recommended and may lead to unintended lock scope.
 
+Right‑click any Java file or source folder, then choose **Analyze → Analyze Static Thread Lock**. Results are shown in the **Thread Lock Detector** tool window.
 
-## How to Use
-### 1, Install the plugin.
-clone the repo
+### Runtime deadlock monitor
+Attaches to a running Java process and detects actual deadlocks.
 
-```bash
-https://github.com/pwang313-canada/intellij-plugin.git
+- Open the tool window (bottom left) and click **Refresh** to list all running Java applications.
+- Select a process from the dropdown and click **Connect**.
+- Once connected, click **Start Monitoring**. Any deadlock is instantly reported with full stack traces.
+
+## User Interface
+
+The tool window is divided into two resizable sections:
+
+- **Top** – static analysis results in a table. Double‑click any row to navigate to the source line.
+- **Bottom** – runtime monitor with collapsible connection controls, a clear log button, and a scrollable deadlock log.
+
+Static issues are highlighted with severity icons:
+
+- 🔴 **Error** (red)
+- 🟠 **Warning** (orange)
+- ℹ️ **Information** (blue)
+
+The runtime monitor includes a **Clear Log** button to reset the deadlock display.
+
+## Requirements
+
+- IntelliJ IDEA 2023.3 or later (Community or Ultimate)
+- Java 11+
+
+## Installation
+
+1. Download the plugin JAR file from the releases page (or build it yourself).
+2. In IntelliJ IDEA, go to **File → Settings → Plugins**.
+3. Click the gear icon and select **Install Plugin from Disk…**.
+4. Choose the downloaded JAR and restart the IDE.<br/>
+![thread-lock-ui.png](src/main/resources/images/thread-lock-ui.png)
+
+## Usage
+
+### Static Analysis
+- Open a Java project.
+- Right‑click a Java file or a source folder in the **Project** view.
+- Select **Analyze → Analyze Static Thread Lock**.
+- Results appear in the **Thread Lock Detector** tool window (open via **View → Tool Windows → Thread Lock Detector** if not already visible).
+![static-thread-lock-detector.png](src/main/resources/images/static-thread-lock-detector.png)
+
+### Runtime Monitoring
+- Open the **Thread Lock Detector** tool window.
+- Click **Refresh** to see a list of running Java processes.
+- Select the process you want to monitor and click **Connect**.
+- Click **Start Monitoring**. The monitor will check for deadlocks every 5 seconds.
+- Any deadlock found is displayed in the log area with a full thread dump.<br/>
+![runtim-thread-lock.png](src/main/resources/images/runtim-thread-lock.png)
+
+## Building from Source
+
+1. Clone the repository.
+2. Open the project in IntelliJ IDEA.
+3. Run `./gradlew buildPlugin` to build the plugin.
+4. The plugin zip will be in `build/distributions/`.
+5. Example for Static and Runtime thread lock detector
+```adlanguage
+https://github.com/pwang313-canada/CommonJavaIssueDetect/tree/main/ThreadLockExample/src
 ```
+## License
 
-
-Navigate to the plugin directory:
-
-`intellij-plugin`
-
-Build the plugin:
-
-```bash
-./gradlew :unused-code-detector:buildPlugin
-```
-
-After unused-code-detector.zip is generated under distributions, install it as a local plugin in IntelliJ IDEA.
-
-### 2. Start Java application
-
-Or configure them in IntelliJ:
-
-![add-vm-to-intellij.png](src/main/resources/images/add-vm-to-intellij.png)
-
-### 3. Start the plugin and Connect to the Java application
-
-![start-intellij-plugin.png](src/main/resources/images/start-intellij-plugin.png)
-
-## 4. monitor memory change
-
-![connect-to-process.png](src/main/resources/images/connect-to-process.png)
-
-Once the plugin appears at the left bottom, you will see:
-
-**`Start Local`**
-
-**`Connect to Process`**
-
-If a process appears greyed out, it means the VM parameters are not configured correctly.
-
-you may get a warning like this
-
-![memory-leak-warning.png](src/main/resources/images/memory-leak-warning.png)
-
-### 5. Confirm a Memory Leak
-
-If `Used Heap` and `Old Gen` do not decrease significantly,
-👉 this is a strong indication of a memory leak.
-
-![memory-leak-confirm.png](src/main/resources/images/memory-leak-confirm.png)
-
-## Future Enhancements
-
-- Located the specific file and line number for the memory leak
+[Your chosen license, e.g., MIT, Apache 2.0, etc.]
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
-## License
-
-[MIT License](LICENSE)
+Bug reports and pull requests are welcome. Please open an issue first to discuss any changes.
 
 ---
 
-Made with ❤️ for Spring Boot developers
+**Note**: The runtime monitor requires that the target Java process runs under the same user account as IntelliJ.

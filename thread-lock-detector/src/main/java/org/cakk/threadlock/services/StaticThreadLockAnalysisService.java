@@ -13,11 +13,11 @@ import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ThreadLockAnalysisService {
+public class StaticThreadLockAnalysisService {
 
   private final Project project;
 
-  public ThreadLockAnalysisService(Project project) {
+  public StaticThreadLockAnalysisService(Project project) {
     this.project = project;
   }
 

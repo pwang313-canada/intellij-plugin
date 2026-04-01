@@ -12,14 +12,12 @@ import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiManager;
-import org.cakk.threadlock.services.ThreadLockAnalysisService;
+import org.cakk.threadlock.services.StaticThreadLockAnalysisService;
 import org.cakk.threadlock.ui.ThreadLockToolWindowFactory;
 import org.cakk.threadlock.ui.ThreadLockToolWindowPanel;
 import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
-
-public class AnalyzeThreadLocksAction extends AnAction implements DumbAware {
+public class AnalyzeStaticThreadLocksAction extends AnAction implements DumbAware {
 
   @Override
   public void actionPerformed(@NotNull AnActionEvent e) {
@@ -28,7 +26,7 @@ public class AnalyzeThreadLocksAction extends AnAction implements DumbAware {
 
     ThreadLockToolWindowPanel panel = project.getUserData(ThreadLockToolWindowFactory.KEY);
     if (panel == null) {
-      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Thread Lock Checker");
+      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Dead Lock Checker");
       if (toolWindow != null) {
         toolWindow.show();
       }
@@ -44,7 +42,7 @@ public class AnalyzeThreadLocksAction extends AnAction implements DumbAware {
     panel.clearResults();
     panel.setStatus("Analyzing for thread lock issues...");
 
-    ThreadLockAnalysisService service = new ThreadLockAnalysisService(project);
+    StaticThreadLockAnalysisService service = new StaticThreadLockAnalysisService(project);
 
     PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
     PsiDirectory directory = null;

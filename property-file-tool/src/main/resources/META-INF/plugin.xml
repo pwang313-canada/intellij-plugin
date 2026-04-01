@@ -14,16 +14,16 @@
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
 
             <action id="PropertyTool.ConvertYaml"
-                    class="org.cakk.propertytool.action.ConvertYamlToPropertiesAction"
+                    class="org.cakk.propertytool.actions.ConvertYamlToPropertiesAction"
                     text="Convert YAML → Properties"
                     description="Convert YAML to Properties file"/>
             <action id="PropertyTool.ConvertProperties"
-                    class="org.cakk.propertytool.action.ConvertPropertiesToYamlAction"
+                    class="org.cakk.propertytool.actions.ConvertPropertiesToYamlAction"
                     text="Convert Properties → YAML"
                     description="Convert Properties to YAML file"/>
             <separator/>
-            <action id="org.cakk.propertytool.action.MergePropertiesAction"
-                    class="org.cakk.propertytool.action.MergePropertiesAction"
+            <action id="org.cakk.propertytool.actions.MergePropertiesAction"
+                    class="org.cakk.propertytool.actions.MergePropertiesAction"
                     text="Merge and Clean Properties Files"
                     description="Merge all properties files and move common properties to application.properties"/>
         </group>
