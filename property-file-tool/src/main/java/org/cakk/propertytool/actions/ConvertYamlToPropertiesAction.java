@@ -1,4 +1,4 @@
-package org.cakk.propertytool.action;
+package org.cakk.propertytool.actions;
 
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
@@ -16,6 +16,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static org.cakk.propertytool.util.Utils.isPropertyFile;
+
 public class ConvertYamlToPropertiesAction extends AnAction {
 
   private static final Logger LOG = Logger.getInstance(ConvertYamlToPropertiesAction.class);
@@ -28,18 +30,17 @@ public class ConvertYamlToPropertiesAction extends AnAction {
 
   @Override
   public void update(@NotNull AnActionEvent e) {
-    VirtualFile[] files = e.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
-
-    boolean visible = files != null && files.length > 0 &&
-            Arrays.stream(files).allMatch(this::isYamlFile);
-
-    e.getPresentation().setEnabledAndVisible(visible);
-
-    if (files != null && files.length > 1) {
-      e.getPresentation().setText("Convert " + files.length + " YAML Files to Properties");
-    } else {
-      e.getPresentation().setText("Convert YAML to Properties");
+    VirtualFile[] files = e.getData(PlatformDataKeys.VIRTUAL_FILE_ARRAY);
+    boolean enabled = false;
+    if (files != null && files.length == 1) {
+      VirtualFile vf = files[0];
+      if (!vf.isDirectory()) {
+        enabled = isYamlFile(vf);
+      } else {
+        enabled = vf.getName().equals("resources");
+      }
     }
+    e.getPresentation().setEnabledAndVisible(enabled);
   }
 
   private boolean isYamlFile(VirtualFile file) {

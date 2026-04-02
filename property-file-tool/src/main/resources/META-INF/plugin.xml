@@ -2,7 +2,23 @@
 
     <id>org.cakk.propertytool</id>
     <name>Property File Operator</name>
-    <vendor email="pwang313@gmail.com">Example</vendor>
+    <version>1.0.0</version>
+    <vendor email="pwang313@gmail.com">Cakk TechSoft Inc.</vendor>
+
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Properties Validator"
+                   anchor="bottom"
+                   factoryClass="org.cakk.propertytool.ui.PropertiesValidatorToolWindowFactory"/>
+        <!-- ✅ Notification group (THIS is what you're missing) -->
+        <notificationGroup
+                id="Properties Validator"
+                displayType="BALLOON"
+                isLogByDefault="true"/>
+
+    </extensions>
 
     <actions>
 
@@ -11,19 +27,25 @@
                description="Tools for YAML and Properties"
                popup="true">
 
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
 
             <action id="PropertyTool.ConvertYaml"
-                    class="org.cakk.propertytool.action.ConvertYamlToPropertiesAction"
+                    class="org.cakk.propertytool.actions.ConvertYamlToPropertiesAction"
                     text="Convert YAML → Properties"
                     description="Convert YAML to Properties file"/>
             <action id="PropertyTool.ConvertProperties"
-                    class="org.cakk.propertytool.action.ConvertPropertiesToYamlAction"
+                    class="org.cakk.propertytool.actions.ConvertPropertiesToYamlAction"
                     text="Convert Properties → YAML"
                     description="Convert Properties to YAML file"/>
             <separator/>
-            <action id="org.cakk.propertytool.action.MergePropertiesAction"
-                    class="org.cakk.propertytool.action.MergePropertiesAction"
+            <action id="PropertiesValidator.AnalyzeFile"
+                    class="org.cakk.propertytool.actions.AnalyzePropertiesAction"
+                    text="Validate Properties"
+                    description="Analyze properties file for errors">
+            </action>
+            <separator/>
+            <action id="org.cakk.propertytool.actions.MergePropertiesAction"
+                    class="org.cakk.propertytool.actions.MergePropertiesAction"
                     text="Merge and Clean Properties Files"
                     description="Merge all properties files and move common properties to application.properties"/>
         </group>

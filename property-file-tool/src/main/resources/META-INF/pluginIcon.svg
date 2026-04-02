@@ -1,0 +1,24 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" rx="10" fill="#2B2D30"></rect>
+
+  <!-- Document -->
+  <rect x="14" y="10" width="36" height="44" rx="4" fill="#3C3F41"></rect>
+
+  <!-- Lines (properties) -->
+  <rect x="20" y="18" width="24" height="2" fill="#A9B7C6"></rect>
+  <rect x="20" y="24" width="20" height="2" fill="#A9B7C6"></rect>
+  <rect x="20" y="30" width="22" height="2" fill="#A9B7C6"></rect>
+
+  <!-- Gear (merge/cleanup) -->
+  <circle cx="46" cy="44" r="6" fill="#4FC1FF"></circle>
+  <circle cx="46" cy="44" r="3" fill="#2B2D30"></circle>
+
+  <!-- Checkmark (validate) -->
+  <circle cx="18" cy="44" r="6" fill="#6A8759"></circle>
+  <path d="M15 44 L17 46 L21 41" stroke="#FFFFFF" stroke-width="2" fill="none"></path>
+
+  <!-- Convert arrows -->
+  <path d="M22 36 L28 36 L26 34 M28 36 L26 38" stroke="#C586C0" stroke-width="2" fill="none"></path>
+  <path d="M42 36 L36 36 L38 34 M36 36 L38 38" stroke="#C586C0" stroke-width="2" fill="none"></path>
+</svg>
