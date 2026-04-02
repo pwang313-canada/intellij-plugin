@@ -1,4 +1,3 @@
-// src/main/java/com/cakk/threadlockchecker/inspections/DangerousLockInspection.java
 package org.cakk.threadlock.actions;
 
 import com.intellij.codeInspection.*;

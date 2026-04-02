@@ -1,14 +1,14 @@
 <!-- src/main/resources/META-INF/plugin.xml -->
 <idea-plugin>
-    <id>com.cakk.threadlockchecker</id>
-    <name>Thread Lock Checker</name>
-    <version>1.0</version>
-    <vendor email="your@email.com">Cakk</vendor>
+    <id>com.cakk.threadlockdetector</id>
+    <name>Thread Lock Detector</name>
+    <version>1.0.0</version>
+    <vendor email="your@email.com">Cakk TechSoft Inc.</vendor>
 
     <!-- Tool window registration -->
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow
-                id="Thread Lock Checker"
+                id="Thread Lock Detector"
                 anchor="bottom"
                 factoryClass="org.cakk.threadlock.ui.ThreadLockToolWindowFactory"
                 canCloseContents="true"/>

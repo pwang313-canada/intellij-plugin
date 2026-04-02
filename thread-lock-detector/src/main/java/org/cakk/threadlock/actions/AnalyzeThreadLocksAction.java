@@ -28,7 +28,7 @@ public class AnalyzeThreadLocksAction extends AnAction implements DumbAware {
 
     ThreadLockToolWindowPanel panel = project.getUserData(ThreadLockToolWindowFactory.KEY);
     if (panel == null) {
-      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Thread Lock Checker");
+      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Thread Lock Detector");
       if (toolWindow != null) {
         toolWindow.show();
       }

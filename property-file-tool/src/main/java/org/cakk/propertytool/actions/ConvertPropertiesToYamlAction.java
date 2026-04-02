@@ -1,4 +1,4 @@
-package org.cakk.propertytool.action;
+package org.cakk.propertytool.actions;
 
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -14,6 +14,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static org.cakk.propertytool.util.Utils.isPropertyFile;
+
 public class ConvertPropertiesToYamlAction extends AnAction implements DumbAware {
 
   @Override
@@ -23,19 +25,18 @@ public class ConvertPropertiesToYamlAction extends AnAction implements DumbAware
 
   @Override
   public void update(AnActionEvent e) {
-    VirtualFile[] files = e.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
-    boolean visible = false;
-
-    if (files != null) {
-      for (VirtualFile f : files) {
-        if (f.getName().endsWith(".properties") || f.isDirectory()) {
-          visible = true;
-          break;
-        }
+    VirtualFile[] files = e.getData(PlatformDataKeys.VIRTUAL_FILE_ARRAY);
+    boolean enabled = false;
+    if (files != null && files.length == 1) {
+      VirtualFile vf = files[0];
+      if (!vf.isDirectory()) {
+        enabled = isPropertyFile(vf);
+      } else {
+        // Only enable for folders named "resources"
+        enabled = vf.getName().equals("resources");
       }
     }
-
-    e.getPresentation().setEnabledAndVisible(visible);
+    e.getPresentation().setEnabledAndVisible(enabled);
   }
 
   @Override

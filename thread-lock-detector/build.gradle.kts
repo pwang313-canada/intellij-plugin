@@ -46,7 +46,7 @@ tasks {
             <ul>
                 <li>Right‑click a Java file or source folder in the project view, then select <strong>Analyze → Analyze Thread Lock</strong>.</li>
                 <li>Alternatively, from the edit window, open the java file, right click, go to <strong>Analyze → Analyze Thread Lock</strong> while a Java file is open or selected.</li>
-                <li>Results are displayed in the <strong>Thread Lock Checker</strong> tool window.</li>
+                <li>Results are displayed in the <strong>Thread Lock Detector</strong> tool window.</li>
             </ul>
             
             <p>The analysis runs in the background and shows detailed warnings with line numbers and suggested fixes.</p>
