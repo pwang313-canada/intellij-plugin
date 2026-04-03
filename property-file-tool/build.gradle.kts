@@ -62,15 +62,15 @@ tasks {
             </ul>
 
             <h3>How It Works:</h3>
-            <p>
-            Simply right-click on a single <code>.properties</code> file or a <code>resources</code> folder,
+            <ul>
+            <li>Simply right-click on a single <code>.properties</code> file or a <code>resources</code> folder,
             and choose the desired action from the context menu. The plugin will automatically perform
-            the selected operation.
-            If right-click on source root folder, normally it's <code>java</code>, any unused property will show on the result window
-            </p>
+            the selected operation.</li>
+            <li>If right-click on source root folder, normally it's <code>java</code>, any unused property will show on the result window.</li>
+            </ul>
 
             <h3>Known Issues</h3>
-            <p>You may have a <strong> IDE error occurred</strong> at the first run, it's an IntelliJ issue, just ignore it, try again.</p>
+            <li>You may have a <strong> IDE error occurred</strong> at the first run, it's an IntelliJ issue, just ignore it, try again.</li>
 
             <p>Boost your productivity and manage configuration files with ease!</p>
             <p>Supported IntelliJ versions: 2024.3 and later.</p>
