@@ -1,10 +1,10 @@
 package org.cakk.propertytool.ui;
 
+import com.intellij.openapi.diagnostic.Logger;
 import org.cakk.propertytool.analysis.AnalysisResult;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.components.Service;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
