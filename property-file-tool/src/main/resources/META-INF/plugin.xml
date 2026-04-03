@@ -2,16 +2,19 @@
 
     <id>org.cakk.propertytool</id>
     <name>Property File Operator</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="pwang313@gmail.com">Cakk TechSoft Inc.</vendor>
 
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Properties Validator"
                    anchor="bottom"
-                   factoryClass="org.cakk.propertytool.ui.PropertiesValidatorToolWindowFactory"/>
+                   factoryClass="org.cakk.propertytool.ui.PropertiesValidatorToolWindowFactory"
+                   icon="AllIcons.Toolwindows.Problems"/>
+
         <!-- ✅ Notification group (THIS is what you're missing) -->
         <notificationGroup
                 id="Properties Validator"
