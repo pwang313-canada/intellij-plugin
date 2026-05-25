@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "org.cakk.property-file-tool"
-version = "1.0.1"
+version = "1.0.2"
 
 repositories {
     mavenCentral()
@@ -70,8 +70,10 @@ tasks {
             </ul>
 
             <h3>Known Issues</h3>
-            <li>You may have a <strong> IDE error occurred</strong> at the first run, it's an IntelliJ issue, just ignore it, try again.</li>
-
+            <ul>
+                <li>You may have a <strong>IDE error occurred</strong> at the first run; it's an IntelliJ issue, just ignore it and try again.</li>
+            </ul>
+            
             <p>Boost your productivity and manage configuration files with ease!</p>
             <p>Supported IntelliJ versions: 2024.3 and later.</p>
         """.trimIndent())
@@ -83,8 +85,36 @@ tasks {
                 <li>🔧 Improve cross‑reference analysis (Java PSI)</li>
                 <li>🚀 Support for IntelliJ 2024.3+</li>
             </ul>
+            <h3>Version 1.0.2</h3>
+            <ul>
+                <li>🎉 Upgrade version to support IntelliJ 2026.3</li>
+            </ul>
         """.trimIndent())
 
         version.set(project.version.toString())
+    }
+
+    runIde {
+        jvmArgs(
+            "-Xmx2g",
+            "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
+            "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+        )
+    }
+
+    compileJava {
+        options.encoding = "UTF-8"
+        // Disable module warnings
+        options.compilerArgs.add("-Xlint:-module")
+        // Add the desktop module
+        options.compilerArgs.add("--add-modules=java.desktop")
+    }
+
+    clean {
+        delete("src/main/java/module-info.java")
     }
 }

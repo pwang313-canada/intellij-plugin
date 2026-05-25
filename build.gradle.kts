@@ -1,6 +1,6 @@
 allprojects {
     group = "org.cakk"
-    version = "1.0.0"
+    version = "1.0.1"
 
     repositories {
         mavenCentral()
@@ -11,7 +11,7 @@ subprojects {
     apply(plugin = "java")
 
     group = "org.cakk"
-    version = "1.0.0"
+    version = "1.0.1"
 
     repositories {
         mavenCentral()
