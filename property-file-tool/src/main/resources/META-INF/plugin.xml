@@ -2,7 +2,7 @@
 
     <id>org.cakk.propertytool</id>
     <name>Property File Operator</name>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <vendor email="pwang313@gmail.com">Cakk TechSoft Inc.</vendor>
 
     <depends>com.intellij.modules.lang</depends>

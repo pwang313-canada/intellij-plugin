@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "org.cakk.memory-leak-detector"
-version = "1.0.1"
+version = "1.0.2"
 
 repositories {
     mavenCentral()
@@ -22,7 +22,7 @@ intellij {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("253.*")
+        untilBuild.set("263.*")
 
         version.set(project.version.toString())
         pluginDescription.set("""
@@ -88,18 +88,24 @@ tasks {
             <ul>
                 <li>🎉 Refer a git repo to check suspicious memory leak application</li>
             </ul>
+            <h3>Version 1.0.2</h3>
+            <ul>
+                <li>🎉 Upgrade to support IntelliJ 2026.3</li>
+            </ul>
         """.trimIndent())
     }
 
     runIde {
-        jvmArgs("-Xmx2g")
-        // Add required opens for Java modules
-        jvmArgs("--add-opens=java.desktop/javax.swing=ALL-UNNAMED")
-        jvmArgs("--add-opens=java.desktop/java.awt=ALL-UNNAMED")
-        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
-        jvmArgs("--add-opens=java.base/java.util=ALL-UNNAMED")
-        jvmArgs("--add-opens=java.base/java.lang.reflect=ALL-UNNAMED")
-        jvmArgs("--add-opens=java.base/java.util.concurrent=ALL-UNNAMED")    }
+        jvmArgs(
+            "-Xmx2g",
+            "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
+            "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+        )
+    }
 
     compileJava {
         options.encoding = "UTF-8"
