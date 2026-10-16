@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false # one red sub-project doesn't cancel the others
       matrix:
-        project: [memory-leak-detector, property-file-tool, thread-lock-detector]
+        project: [memory-leak-detector, property-file-tool, thread-lock-detector, unused-code-detector]
 
     steps:
       - name: Checkout
