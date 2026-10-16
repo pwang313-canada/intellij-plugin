@@ -1,6 +1,7 @@
 # CI for a repo with three independent Gradle sub-projects.
-# Each sub-project has its own wrapper + settings.gradle.kts,
-# so they build in parallel via a matrix.
+# Uses the repo-root Gradle wrapper with -p <subdir>, so each sub-project
+# builds against its own settings.gradle.kts without duplicating the
+# wrapper jar three times.
 # Place at: .github/workflows/ci.yml
 
 name: CI
@@ -33,10 +34,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test (${{ matrix.project }})
-        working-directory: ${{ matrix.project }}
         run: |
-          chmod +x gradlew
-          ./gradlew build
+          # Root wrapper drives each sub-project via -p. Falls back to
+          # java -jar if there is no gradlew script at the repo root.
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew -p ${{ matrix.project }} build
+          else
+            java -jar gradle/wrapper/gradle-wrapper.jar -p ${{ matrix.project }} build
+          fi
 
       - name: Upload test reports (${{ matrix.project }})
         if: always()
@@ -48,8 +54,7 @@ jobs:
   # --- Optional: SonarQube quality gate ---
   # Needs SONAR_TOKEN + SONAR_HOST_URL repo secrets and the
   # org.sonarqube plugin in each sub-project's build.gradle.kts.
-  # With three sub-projects, run one scan per project (matrix again)
-  # or wire them as SonarQube modules — uncomment and adapt when ready.
+  # Uncomment when ready.
   #
   # sonar:
   #   runs-on: ubuntu-latest
@@ -68,10 +73,7 @@ jobs:
   #         java-version: '21'
   #     - uses: gradle/actions/setup-gradle@v4
   #     - name: SonarQube scan (${{ matrix.project }})
-  #       working-directory: ${{ matrix.project }}
   #       env:
   #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-  #       run: |
-  #         chmod +x gradlew
-  #         ./gradlew sonar
+  #       run: ./gradlew -p ${{ matrix.project }} sonar
